@@ -31,7 +31,10 @@ public static class ProjectFile
 
     // ---------- 保存 ----------
 
-    /// <summary>保存工程：UTF-8 JSON，pixels 为按行 RLE（token 形如 NxRRGGBBAA，逗号分隔）。</summary>
+    /// <summary>
+    /// 保存工程：UTF-8 JSON，pixels 为按行 RLE（token 形如 NxRRGGBBAA，逗号分隔）。
+    /// 写入采用「临时文件 + 替换」方式，保证失败时原工程文件不被破坏。
+    /// </summary>
     public static void Save(string path, PixelGrid grid, IReadOnlyList<string> palette)
     {
         var pixels = new string[grid.Height];
@@ -60,7 +63,20 @@ public static class ProjectFile
             palette = palette.Select(p => p.ToUpperInvariant()).ToArray(),
             pixels = pixels,
         };
-        File.WriteAllText(path, JsonSerializer.Serialize(dto));
+
+        // 原子写入：先写同目录临时文件再替换，避免保存中途失败把原工程截断成半截 JSON。
+        string json = JsonSerializer.Serialize(dto);
+        string tmp = path + ".tmp";
+        try
+        {
+            File.WriteAllText(tmp, json);
+            File.Move(tmp, path, overwrite: true);
+        }
+        catch
+        {
+            try { if (File.Exists(tmp)) File.Delete(tmp); } catch { /* 清理失败不掩盖原异常 */ }
+            throw;
+        }
     }
 
     /// <summary>规范格式的 8 位十六进制：RRGGBBAA 顺序；透明像素统一编码为 00000000。</summary>

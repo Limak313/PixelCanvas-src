@@ -86,7 +86,7 @@ public sealed class MainForm : Form
         _canvas = new CanvasControl(_grid);
         _canvasPanel.Controls.Add(_canvas);
         _canvasPanel.Resize += (_, _) => _canvas.UpdateZoom(CanvasAvailable());
-        _canvas.ColorPicked += argb => { _currentColor = argb; SyncSwatchSelection(); };
+        _canvas.ColorPicked += SetCurrentColor;   // 统一入口：画布 / 调色板 / 预览同步
         _canvas.PixelsChanged += () => SetDirty();
         _canvas.StrokeCommitted += before =>
         {
@@ -333,10 +333,9 @@ public sealed class MainForm : Form
         {
             _palette.Add(hex);       // 追加到调色板末尾
             RebuildPaletteUi();
-            idx = _palette.Count - 1;
+            SetDirty();              // 仅调色板内容真正变化时才算工程被修改
         }
         SetCurrentColor(Argb.FromRgbHex(hex));
-        SetDirty();                  // 调色板属于工程内容
     }
 
     // ---------- 画布尺寸 ----------
@@ -469,9 +468,9 @@ public sealed class MainForm : Form
 
     private void ClearCanvas()
     {
+        if (!HasAnyPixel(_grid)) return;         // 已是空画布：不必弹确认框，也不产生历史步骤
         if (MessageBox.Show(this, "确定要清空整个画布吗？（清空后可通过撤销恢复）", "清空画布",
                 MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
-        if (!HasAnyPixel(_grid)) return;         // 已是空画布：不产生历史步骤
         int[] before = _grid.Snapshot();
         _grid.Clear();
         _canvas.RefreshFromData();
