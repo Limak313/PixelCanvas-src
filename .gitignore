@@ -1,0 +1,9 @@
+# 构建产物
+bin/
+obj/
+publish/
+
+# 用户/IDE 本地文件
+*.user
+*.suo
+.vs/
