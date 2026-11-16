@@ -48,6 +48,19 @@ dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release
 
 测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、绘画算法、调色板为无头可运行的核心用例；`UiSmokeTests` 标记为跳过，需交互式桌面 STA 会话手动验证。
 
+## 发布打包
+
+打包脚本 `打包本地MCP.ps1` 先按 Release 构建，再把产物组装成携带 .NET 10 桌面运行时的自包含部署包并生成 zip：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\打包本地MCP.ps1
+```
+
+- 包名默认按 `Directory.Build.props` 的版本号生成（如 `PixelCanvas-Agent-1.0.35-win-x64`）；可用 `-PackageName` 覆盖。
+- 默认会把 Release 产物同步刷新到插件目录 `pixelcanvas-plugin\plugins\pixelcanvas-desktop-v*\app` 与 `server`（排除 pdb）；`-NoPlugin` 可跳过刷新，`-NoPackage` 只刷新插件不生成部署包。
+- 生成的部署包目录、`.zip`、`output/` 均在 `.gitignore` 中，不纳入版本管理。
+- 部署包产出后，可用 `pixelcanvas-batch-check.ps1 -PackageRoot <部署包目录>` 做一次跨进程 MCP 绘画与读取校验。
+
 ## 运行方法
 
 双击桌面的“PixelCanvas 新版”快捷方式，或运行仓库根目录的 `启动PixelCanvas.ps1`。快捷方式打开已安装的 PixelCanvas Desktop 插件所附带的画布，需安装 .NET 10 桌面运行时。本地 MCP 使用仅限当前用户的命名管道，不监听网络端口。

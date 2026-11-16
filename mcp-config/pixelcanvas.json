@@ -1,11 +1,11 @@
 {
   "mcpServers": {
     "pixelcanvas": {
-      "command": "D:\\像素画布\\PixelCanvas-Agent-1.0.35-parentdir-20261105\\runtime\\dotnet.exe",
+      "command": "${PACKAGE_ROOT}\\runtime\\dotnet.exe",
       "args": [
-        "D:\\像素画布\\PixelCanvas-Agent-1.0.35-parentdir-20261105\\server\\PixelCanvas.Mcp.dll"
+        "${PACKAGE_ROOT}\\server\\PixelCanvas.Mcp.dll"
       ],
-      "env": { "PIXELCANVAS_OUTPUT_DIR": "D:\\像素出图" }
+      "env": { "PIXELCANVAS_OUTPUT_DIR": "${PACKAGE_ROOT}\\output" }
     }
   }
 }

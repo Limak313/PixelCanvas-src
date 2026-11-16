@@ -1,11 +1,11 @@
-﻿$ErrorActionPreference = 'Stop'
-$root = Join-Path $PSScriptRoot 'PixelCanvas-Agent-1.0.35-parentdir-20261105'
-$env:DOTNET_ROOT = Join-Path $root 'runtime'
+﻿param([Parameter(Mandatory = $true)][string]$PackageRoot)
+$ErrorActionPreference = 'Stop'
+$env:DOTNET_ROOT = Join-Path $PackageRoot 'runtime'
 $env:DOTNET_ROOT_X64 = $env:DOTNET_ROOT
-$app = Start-Process -FilePath "$root\app\PixelCanvas.exe" -ArgumentList '4','4' -PassThru
+$app = Start-Process -FilePath (Join-Path $PackageRoot 'app\PixelCanvas.exe') -ArgumentList '4','4' -PassThru
 $server = [Diagnostics.Process]::new()
-$server.StartInfo.FileName = Join-Path $root 'runtime\dotnet.exe'
-$server.StartInfo.ArgumentList.Add("$root\server\PixelCanvas.Mcp.dll")
+$server.StartInfo.FileName = Join-Path $PackageRoot 'runtime\dotnet.exe'
+$server.StartInfo.ArgumentList.Add((Join-Path $PackageRoot 'server\PixelCanvas.Mcp.dll'))
 $server.StartInfo.UseShellExecute = $false
 $server.StartInfo.RedirectStandardInput = $true
 $server.StartInfo.RedirectStandardOutput = $true

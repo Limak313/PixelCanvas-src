@@ -6,31 +6,31 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v10.0": {
-      "PixelCanvas.Mcp/1.0.0": {
+      "PixelCanvas.Mcp/1.0.35": {
         "dependencies": {
-          "PixelCanvas": "1.0.0"
+          "PixelCanvas": "1.0.35"
         },
         "runtime": {
           "PixelCanvas.Mcp.dll": {}
         }
       },
-      "PixelCanvas/1.0.0": {
+      "PixelCanvas/1.0.35": {
         "runtime": {
           "PixelCanvas.dll": {
-            "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.0.0"
+            "assemblyVersion": "1.0.35.0",
+            "fileVersion": "1.0.35.0"
           }
         }
       }
     }
   },
   "libraries": {
-    "PixelCanvas.Mcp/1.0.0": {
+    "PixelCanvas.Mcp/1.0.35": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
     },
-    "PixelCanvas/1.0.0": {
+    "PixelCanvas/1.0.35": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

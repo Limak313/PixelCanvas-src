@@ -7,6 +7,7 @@ publish-*/
 
 # 部署包与压缩归档（由打包脚本生成，不入库）
 PixelCanvas-Agent-*/
+*-build/
 *.zip
 
 # 运行产出目录

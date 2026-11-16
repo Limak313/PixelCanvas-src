@@ -1,5 +1,6 @@
 using System.IO.Pipes;
 using System.Diagnostics;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -136,12 +137,18 @@ public static class McpBridge
         }
     }
 
+    private static string ServerVersion()
+    {
+        var v = typeof(McpBridge).Assembly.GetName().Version;
+        return v is null ? "1.0.0" : $"{v.Major}.{v.Minor}.{v.Build}";
+    }
+
     private static object Initialize(JsonObject? args)
     {
         string? requested = args?["protocolVersion"]?.GetValue<string>();
         string version = requested is "2025-11-25" or "2025-06-18" or "2025-03-26" or "2024-11-05" ? requested : "2025-06-18";
         return new { protocolVersion = version, capabilities = new { tools = new { listChanged = false } },
-            serverInfo = new { name = "pixelcanvas", version = "1.0.0" },
+            serverInfo = new { name = "pixelcanvas", version = ServerVersion() },
             instructions = "本地画布使用 process_id 区分窗口；图层索引从底部 0 开始。文件绘制保存到新的输出文件，不覆盖源文件。" };
     }
 
