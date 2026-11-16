@@ -51,14 +51,14 @@ public class UiSmokeTests
             UiTestSupport.Handle(form, new { action = "paint", arguments = new { pixels = new[] { new { x = 0, y = 0, color = "#00FF00" } } } });
 
             UiTestSupport.Invoke(form, "SwitchFrame", 0);
-            var grid = UiTestSupport.Field<PixelGrid>(form, "_grid");
-            Assert.Equal(Argb.FromRgb(0xFF0000), grid.Get(0, 0));
+            // 注意：SwitchFrame 会替换 _grid 指向的 Grid 对象，断言前必须重新取字段，不能缓存跨帧引用。
+            Assert.Equal(Argb.FromRgb(0xFF0000), UiTestSupport.Field<PixelGrid>(form, "_grid").Get(0, 0));
 
             UiTestSupport.Handle(form, new { action = "undo", arguments = new { } });
-            Assert.Equal(Argb.Transparent, grid.Get(0, 0));
+            Assert.Equal(Argb.Transparent, UiTestSupport.Field<PixelGrid>(form, "_grid").Get(0, 0));
 
             UiTestSupport.Invoke(form, "SwitchFrame", 1);
-            Assert.Equal(Argb.FromRgb(0x00FF00), grid.Get(0, 0));
+            Assert.Equal(Argb.FromRgb(0x00FF00), UiTestSupport.Field<PixelGrid>(form, "_grid").Get(0, 0));
 
             UiTestSupport.Invoke(form, "ToggleAnimation");
             Assert.True(UiTestSupport.Field<bool>(form, "_playing"));
@@ -116,7 +116,7 @@ public class UiSmokeTests
             Assert.Equal(Argb.Transparent, grid.Get(0, 0));
             Assert.Equal(Argb.Transparent, grid.Get(2, 0));
 
-            string saved = dir.File("batch-saved"), png = Path.Combine(dir.Path, "batch.png");
+            string saved = dir.File("batch-saved.pxproj"), png = Path.Combine(dir.Path, "batch.png");
             var save = J(UiTestSupport.Handle(form, new { action = "save_export", arguments = new { project_path = saved, png_path = png } }));
             Assert.True(File.Exists(saved));
             Assert.True(File.Exists(png));
@@ -142,7 +142,7 @@ public class UiSmokeTests
             var reuse = J(UiTestSupport.Handle(form, new { action = "reuse_info", arguments = new { } }));
             Assert.True(Data(reuse)["reusable"]!.GetValue<bool>());
 
-            string artPath = dir.File("artwork");
+            string artPath = dir.File("artwork.pxproj");
             var artArgs = new
             {
                 width = 4,
@@ -174,7 +174,7 @@ public class UiSmokeTests
                 height = 4,
                 layers = new[] { "底层", "顶层" },
                 operations = new object[] { new { type = "paint", layer = 1, pixels = new[] { new { x = 99, y = 0, color = "#FF0000" } } } },
-                project_path = dir.File("should-not-exist")
+                project_path = dir.File("should-not-exist.pxproj")
             };
             var failed = J(UiTestSupport.Handle(failedForm, new { action = "create_artwork", arguments = failedArgs }));
             Assert.Equal("layers_created", Data(failed)["completedStage"]!.GetValue<string>());
@@ -252,7 +252,7 @@ public class UiSmokeTests
             Assert.Same(chosenFrame, frames[0]);
             Assert.Equal(0, UiTestSupport.Field<int>(form, "_activeFrame"));
 
-            string reorderedPath = dir.File("reordered");
+            string reorderedPath = dir.File("reordered.pxproj");
             UiTestSupport.Handle(form, new { action = "save_project", arguments = new { path = reorderedPath } });
             var reordered = ProjectFile.TryLoad(reorderedPath, out _);
             Assert.NotNull(reordered);
@@ -386,7 +386,7 @@ public class UiSmokeTests
 
             var missing = Assert.Throws<TargetInvocationException>(() =>
                 UiTestSupport.Handle(form, new { action = "reference_load", arguments = new { path = Path.Combine(dir.Path, "missing.png") } }));
-            Assert.IsType<IOException>(UiTestSupport.Inner<IOException>(missing));
+            Assert.IsAssignableFrom<IOException>(missing.InnerException);
             referenceState = Data(J(UiTestSupport.Handle(form, new { action = "reference_info", arguments = new { } })));
             Assert.True(referenceState["loaded"]!.GetValue<bool>());
 
@@ -422,7 +422,6 @@ public class UiSmokeTests
         {
             using var form = new MainForm(5, 5);
             form.CreateControl();
-            var grid = UiTestSupport.Field<PixelGrid>(form, "_grid");
 
             string? priorRoot = Environment.GetEnvironmentVariable("PIXELCANVAS_OUTPUT_DIR");
             Environment.SetEnvironmentVariable("PIXELCANVAS_OUTPUT_DIR", dir.Path);
@@ -456,14 +455,15 @@ public class UiSmokeTests
             UiTestSupport.Handle(form, new { action = "selection_copy", arguments = new { } });
             var pasted = Data(J(UiTestSupport.Handle(form, new { action = "selection_paste", arguments = new { } })));
             Assert.True(pasted["changed"]!.GetValue<bool>());
-            Assert.Equal(Argb.FromRgb(0x123456), grid.Get(1, 1));
+            // add_frame 已切换过帧，_grid 指向新帧网格；断言前重新取字段，不能缓存旧引用。
+            Assert.Equal(Argb.FromRgb(0x123456), UiTestSupport.Field<PixelGrid>(form, "_grid").Get(1, 1));
 
             var clearConfirm = Assert.Throws<TargetInvocationException>(() =>
                 UiTestSupport.Handle(form, new { action = "clear_layer", arguments = new { confirm = false } }));
             Assert.IsType<ArgumentException>(UiTestSupport.Inner<ArgumentException>(clearConfirm));
             UiTestSupport.Handle(form, new { action = "clear_layer", arguments = new { confirm = true } });
             UiTestSupport.Handle(form, new { action = "undo", arguments = new { } });
-            Assert.Equal(Argb.FromRgb(0x123456), grid.Get(1, 1));
+            Assert.Equal(Argb.FromRgb(0x123456), UiTestSupport.Field<PixelGrid>(form, "_grid").Get(1, 1));
 
             UiTestSupport.Handle(form, new { action = "add_layer", arguments = new { } });
             var selected = Data(J(UiTestSupport.Handle(form, new { action = "select_layer", arguments = new { layer = 0 } })));
@@ -480,7 +480,7 @@ public class UiSmokeTests
             var resizeConfirm = Assert.Throws<TargetInvocationException>(() =>
                 UiTestSupport.Handle(form, new { action = "resize", arguments = new { width = 8, height = 8, confirm = false } }));
             Assert.IsType<ArgumentException>(UiTestSupport.Inner<ArgumentException>(resizeConfirm));
-            Assert.Equal(Argb.FromRgb(0x123456), grid.Get(0, 0));
+            Assert.Equal(Argb.FromRgb(0x123456), UiTestSupport.Field<PixelGrid>(form, "_grid").Get(0, 0));
 
             var resized = Data(J(UiTestSupport.Handle(form, new { action = "resize", arguments = new { width = 8, height = 8, confirm = true } })));
             Assert.Equal(8, resized["canvas"]!["width"]!.GetValue<int>());
