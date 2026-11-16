@@ -50,6 +50,11 @@ public sealed partial class MainForm : Form
         MinimumSize = new Size(960, 600);
         StartPosition = FormStartPosition.CenterScreen;
         KeyPreview = true;
+        try
+        {
+            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+        }
+        catch { /* 图标提取失败时保留默认窗体图标 */ }
         Font = new Font("Microsoft YaHei UI", 9F);
         BackColor = Color.FromArgb(31, 35, 43);
         ForeColor = Color.FromArgb(224, 229, 237);

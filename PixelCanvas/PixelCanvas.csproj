@@ -9,10 +9,15 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationIcon>Assets\pixelcanvas.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="PixelCanvas.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\pixelcanvas.ico" CopyToOutputDirectory="PreserveNewest" Link="pixelcanvas.ico" />
   </ItemGroup>
 
 </Project>

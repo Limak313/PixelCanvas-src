@@ -35,6 +35,7 @@ if (-not $NoPlugin) {
     $pluginServer = Join-Path $pluginDir 'server'
     New-Item -ItemType Directory -Path $pluginApp, $pluginServer -Force | Out-Null
     foreach ($name in $appFiles) { Copy-Item -LiteralPath (Join-Path $appOut $name) -Destination $pluginApp -Force }
+    Copy-Item -LiteralPath (Join-Path $projectRoot 'PixelCanvas\Assets\pixelcanvas.ico') -Destination $pluginApp -Force
     foreach ($name in $serverFiles) {
         $src = Join-Path $serverOut $name
         if (Test-Path -LiteralPath $src) { Copy-Item -LiteralPath $src -Destination $pluginServer -Force }
@@ -54,6 +55,7 @@ $rtVersion = $versions[0].Name
 if (!(Test-Path -LiteralPath (Join-Path $dotnetRoot "host\fxr\$rtVersion\hostfxr.dll"))) { throw "找不到匹配的 hostfxr：$rtVersion" }
 foreach ($dir in @('app', 'server', 'runtime\host\fxr', 'runtime\shared\Microsoft.NETCore.App', 'runtime\shared\Microsoft.WindowsDesktop.App')) { New-Item -ItemType Directory -Path (Join-Path $packageRoot $dir) -Force | Out-Null }
 foreach ($name in $appFiles) { Copy-Item -LiteralPath (Join-Path $appOut $name) -Destination (Join-Path $packageRoot 'app') }
+Copy-Item -LiteralPath (Join-Path $projectRoot 'PixelCanvas\Assets\pixelcanvas.ico') -Destination (Join-Path $packageRoot 'app') -Force
 foreach ($name in @('PixelCanvas.Mcp.exe', 'PixelCanvas.Mcp.dll', 'PixelCanvas.Mcp.deps.json', 'PixelCanvas.Mcp.runtimeconfig.json', 'PixelCanvas.dll')) { Copy-Item -LiteralPath (Join-Path $serverOut $name) -Destination (Join-Path $packageRoot 'server') }
 Copy-Item -LiteralPath (Join-Path $dotnetRoot 'dotnet.exe'), (Join-Path $dotnetRoot 'LICENSE.txt'), (Join-Path $dotnetRoot 'ThirdPartyNotices.txt') -Destination (Join-Path $packageRoot 'runtime')
 Copy-Item -LiteralPath (Join-Path $dotnetRoot "host\fxr\$rtVersion") -Destination (Join-Path $packageRoot 'runtime\host\fxr') -Recurse
