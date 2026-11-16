@@ -8,8 +8,7 @@ internal static class ExportPresets
 {
     private static string Folder()
     {
-        string? configured = Environment.GetEnvironmentVariable("PIXELCANVAS_PRESET_DIR");
-        string path = !string.IsNullOrWhiteSpace(configured) && Path.IsPathFullyQualified(configured) ? configured : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PixelCanvas");
+        string path = AppPaths.PresetRoot;
         System.IO.Directory.CreateDirectory(path); return path;
     }
 

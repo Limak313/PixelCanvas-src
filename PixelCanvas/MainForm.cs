@@ -9,27 +9,8 @@ namespace PixelCanvas;
 /// <summary>主窗口：界面布局与交互编排（工具 / 调色板 / 尺寸 / 工程 / 导出）。</summary>
 public sealed partial class MainForm : Form
 {
-    private PixelGrid _grid = new(32, 32);
-    private List<Layer> _layers = new();
-    private HistoryBudget _historyBudget = new();
-    private int _activeLayer;
-    private History _history => _layers[_activeLayer].History;
+    // ---------- 界面控件字段 ----------
     private ListBox _layerList = null!;
-    private bool _updatingLayers;
-    private List<string> _palette;
-    private int _currentColor;
-    private string? _projectPath;
-    private byte[]? _projectFingerprint;
-    private bool _recoveryPending;
-    private bool _dirty;
-    private bool _manualZoom;
-    private bool _centerCanvas;
-    private readonly System.Windows.Forms.Timer _autosaveTimer = new() { Interval = 60_000 };
-    private readonly string _recoveryDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PixelCanvas", "Recovery");
-    private readonly string _recoveryId = Guid.NewGuid().ToString("N");
-    private string RecoveryPath => Path.Combine(_recoveryDirectory, _recoveryId + ".pxproj");
-    private FileStream? _recoveryLock;
-    private bool _autosaveErrorShown;
 
     private CanvasControl _canvas = null!;
     private Panel _canvasPanel = null!;
@@ -37,9 +18,6 @@ public sealed partial class MainForm : Form
     private Control _leftHandle = null!, _rightHandle = null!, _commandBar = null!, _statusBar = null!;
     private CheckBox _referenceVisible = null!;
     private NumericUpDown _referenceOpacity = null!;
-    private bool _immersive, _leftWasVisible, _rightWasVisible;
-    private FormBorderStyle _previousBorder;
-    private FormWindowState _previousWindowState;
     private ComboBox _sizeCombo = null!;
     private Label _sizeLabel = null!;
     private NumericUpDown _brushSize = null!;

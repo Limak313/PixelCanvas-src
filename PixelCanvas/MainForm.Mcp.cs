@@ -34,6 +34,13 @@ public sealed partial class MainForm
         _ = RunMcpPipeAsync(_mcpCancellation.Token);
     }
 
+    /// <summary>
+    /// 管道服务后台循环：在后台线程接受本地当前用户级命名管道连接，每个请求经
+    /// <see cref="System.Windows.Forms.Control.InvokeAsync"/> 封送到 UI 线程串行执行
+    /// <see cref="HandleMcpRequest"/>。恢复中 / 播放中 / 画布交互中的并发闸门都在 UI 线程判定。
+    /// 取消令牌只在等待连接与管道读写阶段生效；委托一旦进入 UI 线程执行，便不再响应取消。
+    /// 管道实例数为 1，同一时刻只服务一个 MCP 客户端，请求在 UI 线程排队串行处理。
+    /// </summary>
     private async Task RunMcpPipeAsync(CancellationToken cancellation)
     {
         string name = $"PixelCanvas.Mcp.{Environment.ProcessId}";
@@ -560,6 +567,8 @@ public sealed partial class MainForm
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
         _mcpCancellation?.Cancel();
+        _mcpCancellation?.Dispose();
+        _mcpCancellation = null;
         base.OnFormClosed(e);
     }
 }

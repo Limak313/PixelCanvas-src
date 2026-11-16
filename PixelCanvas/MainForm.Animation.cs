@@ -5,16 +5,12 @@ namespace PixelCanvas;
 
 public sealed partial class MainForm
 {
-    private List<AnimationFrame> _frames = new();
-    private int _activeFrame;
-    private int _fps = 8;
     private readonly System.Windows.Forms.Timer _animationTimer = new();
     private FrameTimeline? _timeline;
     private CheckBox? _onionCheck;
     private NumericUpDown _fpsControl = null!;
     private Button _playButton = null!;
     private Control _animationBar = null!;
-    private bool _updatingFrames, _playing;
 
     private void SyncCurrentFrame()
     {
