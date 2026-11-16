@@ -1,0 +1,58 @@
+name: Release
+
+# 发布打包：打 tag（v*）或手动触发时，Windows 环境先过构建+无头测试门禁，
+# 再产出自包含部署包 zip 与插件包 zip，并创建 GitHub Release 上传资产。
+# 三个项目目标框架均为 net10.0-windows 且启用 WinForms，必须使用 Windows runner。
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  publish:
+    name: Build, Package & Release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Release build & headless tests (gate)
+        run: |
+          dotnet build PixelCanvas.slnx -c Release --nologo
+          dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --no-build --nologo
+
+      - name: Package self-contained deployment zip
+        shell: pwsh
+        run: .\打包本地MCP.ps1
+
+      - name: Package plugin zip
+        shell: pwsh
+        run: |
+          $version = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version
+          Compress-Archive -Path pixelcanvas-plugin\* -DestinationPath "pixelcanvas-plugin-$version.zip" -Force
+
+      - name: Create release and upload assets
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version
+          $tag = $env:GITHUB_REF_NAME
+          gh release create $tag `
+            --title "PixelCanvas $version" `
+            --notes "Release $version（Windows x64 自包含部署包 + 插件包；无头核心测试门禁通过）" `
+            "PixelCanvas-Agent-$version-win-x64.zip" `
+            "pixelcanvas-plugin-$version.zip"
