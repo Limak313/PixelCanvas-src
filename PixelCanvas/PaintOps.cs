@@ -3,6 +3,107 @@ namespace PixelCanvas;
 /// <summary>绘制算法（纯数据操作，与界面无关）：画笔 / 橡皮 / 油漆桶 + 镜像对称。</summary>
 public static class PaintOps
 {
+    /// <summary>在起点所在的连续同色区域中绘制线性渐变；镜像使用原始像素判定区域。</summary>
+    public static bool GradientFill(PixelGrid grid, int x0, int y0, int x1, int y1,
+        int startColor, int endColor, bool mirrorH, bool mirrorV)
+    {
+        int width = grid.Width, height = grid.Height;
+        int[] original = grid.Snapshot();
+        var visited = new bool[original.Length];
+        var bestDistance = new int[original.Length];
+        Array.Fill(bestDistance, int.MaxValue);
+        var queue = new Queue<int>();
+        bool changed = false;
+        var mirrors = new List<(bool H, bool V)> { (false, false) };
+        if (mirrorH) mirrors.Add((true, false));
+        if (mirrorV) mirrors.Add((false, true));
+        if (mirrorH && mirrorV) mirrors.Add((true, true));
+
+        foreach (var (horizontal, vertical) in mirrors)
+        {
+            Array.Clear(visited);
+            int sx = horizontal ? width - 1 - x0 : x0, sy = vertical ? height - 1 - y0 : y0;
+            int ex = horizontal ? width - 1 - x1 : x1, ey = vertical ? height - 1 - y1 : y1;
+            int originIndex = sy * width + sx;
+            int target = original[originIndex];
+            double vx = ex - sx, vy = ey - sy, lengthSquared = vx * vx + vy * vy;
+            queue.Enqueue(originIndex);
+            visited[originIndex] = true;
+            while (queue.Count > 0)
+            {
+                int index = queue.Dequeue(), x = index % width, y = index / width;
+                int distance = (x - sx) * (x - sx) + (y - sy) * (y - sy);
+                if (distance < bestDistance[index])
+                {
+                    bestDistance[index] = distance;
+                    double t = lengthSquared == 0 ? 0 : Math.Clamp(((x - sx) * vx + (y - sy) * vy) / lengthSquared, 0, 1);
+                    int Blend(int shift)
+                    {
+                        int a = (int)((uint)startColor >> shift) & 255, b = (int)((uint)endColor >> shift) & 255;
+                        return (int)Math.Round(a + (b - a) * t, MidpointRounding.AwayFromZero);
+                    }
+                    int color = Argb.FromRgb((Blend(16) << 16) | (Blend(8) << 8) | Blend(0));
+                    grid.Set(x, y, color);
+                }
+                void Visit(int nx, int ny)
+                {
+                    if ((uint)nx >= (uint)width || (uint)ny >= (uint)height) return;
+                    int neighbor = ny * width + nx;
+                    if (visited[neighbor] || original[neighbor] != target) return;
+                    visited[neighbor] = true;
+                    queue.Enqueue(neighbor);
+                }
+                Visit(x + 1, y); Visit(x - 1, y); Visit(x, y + 1); Visit(x, y - 1);
+            }
+        }
+        for (int i = 0; i < original.Length; i++)
+            if (original[i] != grid.RawPixels[i]) { changed = true; break; }
+        return changed;
+    }
+    /// <summary>绘制线段或空心形状，端点包含在内。</summary>
+    public static bool DrawShape(PixelGrid grid, ToolKind tool, int x0, int y0, int x1, int y1,
+        int size, int color, bool mirrorH, bool mirrorV)
+    {
+        bool changed = false;
+        void Plot(int x, int y) => changed |= ApplyBrush(grid, x, y, size, color, mirrorH, mirrorV);
+        void Line(int ax, int ay, int bx, int by)
+        {
+            int dx = Math.Abs(bx - ax), dy = Math.Abs(by - ay);
+            int sx = ax < bx ? 1 : -1, sy = ay < by ? 1 : -1, error = dx - dy;
+            while (true)
+            {
+                Plot(ax, ay);
+                if (ax == bx && ay == by) break;
+                int twice = 2 * error;
+                if (twice > -dy) { error -= dy; ax += sx; }
+                if (twice < dx) { error += dx; ay += sy; }
+            }
+        }
+
+        if (tool == ToolKind.Line) Line(x0, y0, x1, y1);
+        else if (tool == ToolKind.Rectangle)
+        {
+            Line(x0, y0, x1, y0); Line(x1, y0, x1, y1);
+            Line(x1, y1, x0, y1); Line(x0, y1, x0, y0);
+        }
+        else if (tool == ToolKind.Ellipse)
+        {
+            if (x0 == x1 || y0 == y1) Line(x0, y0, x1, y1);
+            else
+            {
+                double cx = (x0 + x1) / 2.0, cy = (y0 + y1) / 2.0;
+                double rx = Math.Abs(x1 - x0) / 2.0, ry = Math.Abs(y1 - y0) / 2.0;
+                int steps = Math.Max(16, 8 * Math.Max(Math.Abs(x1 - x0), Math.Abs(y1 - y0)));
+                for (int i = 0; i < steps; i++)
+                {
+                    double angle = 2 * Math.PI * i / steps;
+                    Plot((int)Math.Round(cx + rx * Math.Cos(angle), MidpointRounding.AwayFromZero),
+                         (int)Math.Round(cy + ry * Math.Sin(angle), MidpointRounding.AwayFromZero));
+                }
+            }
+        }
+        return changed;
+    }
     /// <summary>
     /// 计算 (x, y) 在镜像开关下的全部落点：水平镜像 → (宽-1-x, y)，垂直镜像 → (x, 高-1-y)，
     /// 双开共 4 点；去重并仅保留界内点。

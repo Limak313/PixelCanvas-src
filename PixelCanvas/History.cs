@@ -1,47 +1,106 @@
 namespace PixelCanvas;
 
-/// <summary>撤销/重做历史：保存每步操作之前的画布快照，最多 100 步，超出丢弃最旧。</summary>
+/// <summary>各图层共享的历史内存预算，按快照进入历史的先后顺序淘汰。</summary>
+public sealed class HistoryBudget
+{
+    public const long DefaultMaxBytes = 64L * 1024 * 1024;
+    private readonly long _maxBytes;
+    private long _bytes;
+    private readonly LinkedList<History.Entry> _entries = new();
+
+    public HistoryBudget(long maxBytes = DefaultMaxBytes)
+    {
+        if (maxBytes < 1) throw new ArgumentOutOfRangeException(nameof(maxBytes));
+        _maxBytes = maxBytes;
+    }
+
+    internal void Add(History.Entry entry)
+    {
+        entry.Node = _entries.AddLast(entry);
+        _bytes += (long)entry.Pixels.Length * sizeof(int);
+        while (_bytes > _maxBytes && _entries.First is { } first)
+            first.Value.Owner.Evict(first.Value);
+    }
+
+    internal void Remove(History.Entry entry)
+    {
+        if (entry.Node is null) return;
+        _entries.Remove(entry.Node);
+        entry.Node = null;
+        _bytes -= (long)entry.Pixels.Length * sizeof(int);
+    }
+}
+
+/// <summary>每层最多 100 步，所有图层的撤销和重做快照共享内存预算。</summary>
 public sealed class History
 {
-    private readonly List<int[]> _undo = new();
-    private readonly List<int[]> _redo = new();
+    internal sealed class Entry
+    {
+        internal readonly History Owner;
+        internal readonly int[] Pixels;
+        internal LinkedListNode<Entry>? Node;
+        internal Entry(History owner, int[] pixels) { Owner = owner; Pixels = pixels; }
+    }
+
+    private readonly List<Entry> _undo = new();
+    private readonly List<Entry> _redo = new();
+    private readonly HistoryBudget _budget;
     private const int MaxSteps = 100;
 
+    public History(HistoryBudget? budget = null) => _budget = budget ?? new HistoryBudget();
     public bool CanUndo => _undo.Count > 0;
     public bool CanRedo => _redo.Count > 0;
 
-    /// <summary>提交一步（传入操作前的快照），并清空重做栈。</summary>
-    public void Commit(int[] beforeSnapshot)
+    private void Push(List<Entry> stack, int[] pixels)
     {
-        _undo.Add(beforeSnapshot);
-        if (_undo.Count > MaxSteps) _undo.RemoveAt(0);
-        _redo.Clear();
+        var entry = new Entry(this, pixels);
+        stack.Add(entry);
+        _budget.Add(entry);
     }
 
-    /// <summary>撤销：返回操作前的快照，同时把当前状态压入重做栈。</summary>
+    private int[] Pop(List<Entry> stack)
+    {
+        var entry = stack[^1];
+        stack.RemoveAt(stack.Count - 1);
+        _budget.Remove(entry);
+        return entry.Pixels;
+    }
+
+    internal void Evict(Entry entry)
+    {
+        _undo.Remove(entry);
+        _redo.Remove(entry);
+        _budget.Remove(entry);
+    }
+
+    private void ClearStack(List<Entry> stack)
+    {
+        foreach (var entry in stack) _budget.Remove(entry);
+        stack.Clear();
+    }
+
+    public void Commit(int[] beforeSnapshot)
+    {
+        ClearStack(_redo);
+        Push(_undo, beforeSnapshot);
+        if (_undo.Count > MaxSteps) Evict(_undo[0]);
+    }
+
     public int[] Undo(int[] currentSnapshot)
     {
         if (!CanUndo) throw new InvalidOperationException("没有可撤销的历史。");
-        int[] before = _undo[^1];
-        _undo.RemoveAt(_undo.Count - 1);
-        _redo.Add(currentSnapshot);
+        int[] before = Pop(_undo);
+        Push(_redo, currentSnapshot);
         return before;
     }
 
-    /// <summary>重做：返回重做快照，同时把当前状态压回撤销栈。</summary>
     public int[] Redo(int[] currentSnapshot)
     {
         if (!CanRedo) throw new InvalidOperationException("没有可重做的历史。");
-        int[] next = _redo[^1];
-        _redo.RemoveAt(_redo.Count - 1);
-        _undo.Add(currentSnapshot);
+        int[] next = Pop(_redo);
+        Push(_undo, currentSnapshot);
         return next;
     }
 
-    /// <summary>清空全部历史（切换尺寸 / 载入工程时调用）。</summary>
-    public void Clear()
-    {
-        _undo.Clear();
-        _redo.Clear();
-    }
+    public void Clear() { ClearStack(_undo); ClearStack(_redo); }
 }

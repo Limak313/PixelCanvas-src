@@ -1,0 +1,14 @@
+﻿$ErrorActionPreference = 'Stop'
+$root = $PSScriptRoot
+$runtime = Join-Path $root 'runtime\dotnet.exe'
+$server = Join-Path $root 'server\PixelCanvas.Mcp.dll'
+if (!(Test-Path -LiteralPath $runtime -PathType Leaf) -or !(Test-Path -LiteralPath $server -PathType Leaf)) { throw '部署包不完整，请保留 runtime、server 和 app 文件夹。' }
+$output = Join-Path $root 'output'
+New-Item -ItemType Directory -Path $output -Force | Out-Null
+$config = @{ mcpServers = @{ pixelcanvas = @{ command = $runtime; args = @($server); env = @{ PIXELCANVAS_OUTPUT_DIR = $output } } } }
+$target = Join-Path $root 'mcp-config.json'
+if (Test-Path -LiteralPath $target) { throw "配置文件已存在：$target。请先备份或删除后重新生成。" }
+$json = $config | ConvertTo-Json -Depth 8
+[IO.File]::WriteAllText($target, $json, [Text.UTF8Encoding]::new($false))
+Write-Host "配置已生成：$target"
+Write-Host '将 pixelcanvas 配置合并到你的 MCP 客户端配置中，然后重启该客户端。'

@@ -2,8 +2,25 @@
 bin/
 obj/
 publish/
+publish-*/
+*-check/
+
+# 部署包与压缩归档（由打包脚本生成，不入库）
+PixelCanvas-Agent-*/
+*.zip
+
+# 运行产出目录
+output/
+input/
+
+# 临时文件
+*.tmp
+*.tmp-*
+*.pdb
 
 # 用户/IDE 本地文件
 *.user
 *.suo
 .vs/
+.trae/
+.workbuddy/

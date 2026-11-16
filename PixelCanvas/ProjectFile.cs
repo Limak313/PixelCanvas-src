@@ -8,15 +8,25 @@ namespace PixelCanvas;
 public static class ProjectFile
 {
     public const string FormatName = "pixel-canvas-project";
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 3;
 
     /// <summary>实现保护上限：载入时宽/高超过该值直接拒绝，防止异常文件耗尽内存。</summary>
     public const int MaxSide = 1024;
+    public const long MaxFileBytes = 128L * 1024 * 1024;
+    public const int MaxPaletteColors = 1024;
+    public const int MaxFrames = 64;
+    // 保留 JSON/RLE 体积余量，确保多帧作品最坏情况下仍能低于文件上限。
+    public const long MaxAnimationPixels = 11_000_000;
 
     public sealed class LoadResult
     {
         public required PixelGrid Grid { get; init; }
         public required List<string> Palette { get; init; }
+        public required List<Layer> Layers { get; init; }
+        public int ActiveLayer { get; init; }
+        public List<AnimationFrame> Frames { get; init; } = new();
+        public int ActiveFrame { get; init; }
+        public int FramesPerSecond { get; init; } = 8;
     }
 
     private sealed class Dto
@@ -27,6 +37,24 @@ public static class ProjectFile
         [JsonPropertyName("height")] public int height { get; set; }
         [JsonPropertyName("palette")] public string[] palette { get; set; } = [];
         [JsonPropertyName("pixels")] public string[] pixels { get; set; } = [];
+        [JsonPropertyName("layers")] public LayerDto[]? layers { get; set; }
+        [JsonPropertyName("activeLayer")] public int activeLayer { get; set; }
+        [JsonPropertyName("frames"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public FrameDto[]? frames { get; set; }
+        [JsonPropertyName("activeFrame"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? activeFrame { get; set; }
+        [JsonPropertyName("fps"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? fps { get; set; }
+    }
+
+    private sealed class FrameDto
+    {
+        [JsonPropertyName("layers")] public LayerDto[] layers { get; set; } = [];
+        [JsonPropertyName("activeLayer")] public int activeLayer { get; set; }
+    }
+
+    private sealed class LayerDto
+    {
+        [JsonPropertyName("name")] public string name { get; set; } = "";
+        [JsonPropertyName("visible")] public bool visible { get; set; }
+        [JsonPropertyName("pixels")] public string[] pixels { get; set; } = [];
     }
 
     // ---------- 保存 ----------
@@ -35,7 +63,35 @@ public static class ProjectFile
     /// 保存工程：UTF-8 JSON，pixels 为按行 RLE（token 形如 NxRRGGBBAA，逗号分隔）。
     /// 写入采用「临时文件 + 替换」方式，保证失败时原工程文件不被破坏。
     /// </summary>
-    public static void Save(string path, PixelGrid grid, IReadOnlyList<string> palette)
+    public static void Save(string path, IReadOnlyList<Layer> layers, int activeLayer, IReadOnlyList<string> palette, bool overwrite = true,
+        IReadOnlyList<AnimationFrame>? frames = null, int activeFrame = 0, int framesPerSecond = 8)
+    {
+        if (palette.Count is < 1 or > MaxPaletteColors) throw new ArgumentException($"调色板颜色数量必须为 1–{MaxPaletteColors}。");
+        var grid = layers[activeLayer].Grid;
+        if (frames is not null && (frames.Count is < 1 or > MaxFrames || activeFrame < 0 || activeFrame >= frames.Count || framesPerSecond is < 1 or > 30 ||
+            (frames.Count > 1 && frames.Sum(f => (long)f.Layers.Count * grid.Width * grid.Height) > MaxAnimationPixels) ||
+            frames.Any(f => f.Layers.Count is < 1 or > 32 || f.ActiveLayer < 0 || f.ActiveLayer >= f.Layers.Count || f.Layers.Any(l => l.Grid.Width != grid.Width || l.Grid.Height != grid.Height))))
+            throw new ArgumentException("动画帧、图层、尺寸或帧率超出支持范围。");
+        bool animation = frames is not null && (frames.Count > 1 || framesPerSecond != 8);
+        LayerDto[] EncodeLayers(IReadOnlyList<Layer> source) => source.Select(l => new LayerDto { name = l.Name, visible = l.Visible, pixels = EncodeRows(l.Grid) }).ToArray();
+        var dto = new Dto
+        {
+            format = FormatName, version = animation ? CurrentVersion : 2, width = grid.Width, height = grid.Height,
+            palette = palette.Select(p => p.ToUpperInvariant()).ToArray(),
+            layers = animation ? null : EncodeLayers(layers),
+            activeLayer = activeLayer,
+            frames = animation ? frames!.Select(f => new FrameDto { layers = EncodeLayers(f.Layers), activeLayer = f.ActiveLayer }).ToArray() : null,
+            activeFrame = animation ? activeFrame : null,
+            fps = animation ? framesPerSecond : null,
+        };
+        string json = JsonSerializer.Serialize(dto);
+        if (Encoding.UTF8.GetByteCount(json) > MaxFileBytes) throw new IOException("工程文件超过 128 MiB 上限，无法保存。");
+        string tmp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try { File.WriteAllText(tmp, json); File.Move(tmp, path, overwrite); }
+        catch { try { if (File.Exists(tmp)) File.Delete(tmp); } catch { } throw; }
+    }
+
+    private static string[] EncodeRows(PixelGrid grid)
     {
         var pixels = new string[grid.Height];
         for (int y = 0; y < grid.Height; y++)
@@ -54,29 +110,7 @@ public static class ProjectFile
             pixels[y] = sb.ToString();
         }
 
-        var dto = new Dto
-        {
-            format = FormatName,
-            version = CurrentVersion,
-            width = grid.Width,
-            height = grid.Height,
-            palette = palette.Select(p => p.ToUpperInvariant()).ToArray(),
-            pixels = pixels,
-        };
-
-        // 原子写入：先写同目录临时文件再替换，避免保存中途失败把原工程截断成半截 JSON。
-        string json = JsonSerializer.Serialize(dto);
-        string tmp = path + ".tmp";
-        try
-        {
-            File.WriteAllText(tmp, json);
-            File.Move(tmp, path, overwrite: true);
-        }
-        catch
-        {
-            try { if (File.Exists(tmp)) File.Delete(tmp); } catch { /* 清理失败不掩盖原异常 */ }
-            throw;
-        }
+        return pixels;
     }
 
     /// <summary>规范格式的 8 位十六进制：RRGGBBAA 顺序；透明像素统一编码为 00000000。</summary>
@@ -95,13 +129,16 @@ public static class ProjectFile
     public static LoadResult? TryLoad(string path, out string error)
     {
         error = "";
-        string json;
-        try { json = File.ReadAllText(path); }
-        catch (Exception ex) { error = "无法读取文件：" + ex.Message; return null; }
-
         JsonDocument doc;
-        try { doc = JsonDocument.Parse(json); }
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            if (stream.Length > MaxFileBytes) { error = "工程文件超过 128 MiB 上限。"; return null; }
+            doc = JsonDocument.Parse(stream);
+        }
         catch (JsonException ex) { error = "不是有效的 JSON：" + ex.Message; return null; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        { error = "无法读取文件：" + ex.Message; return null; }
 
         using (doc)
         {
@@ -113,16 +150,16 @@ public static class ProjectFile
             { error = $"format 字段必须是 \"{FormatName}\"。"; return null; }
 
             if (!root.TryGetProperty("version", out var ver) || ver.ValueKind != JsonValueKind.Number
-                || !ver.TryGetInt32(out int version) || version != CurrentVersion)
-            { error = "version 必须为 1，该文件不受支持。"; return null; }
+                || !ver.TryGetInt32(out int version) || (version != 1 && version != 2 && version != CurrentVersion))
+            { error = "工程版本不受支持。"; return null; }
 
             if (!TryGetDim(root, "width", out int width) || !TryGetDim(root, "height", out int height))
             { error = "width / height 必须是正整数。"; return null; }
             if (width > MaxSide || height > MaxSide)
             { error = $"画布尺寸 {width}×{height} 超出支持上限 {MaxSide}×{MaxSide}。"; return null; }
 
-            if (!root.TryGetProperty("palette", out var pal) || pal.ValueKind != JsonValueKind.Array || pal.GetArrayLength() < 1)
-            { error = "palette 必须是非空的颜色数组。"; return null; }
+            if (!root.TryGetProperty("palette", out var pal) || pal.ValueKind != JsonValueKind.Array || pal.GetArrayLength() is < 1 or > MaxPaletteColors)
+            { error = $"palette 颜色数量必须为 1–{MaxPaletteColors}。"; return null; }
             var palette = new List<string>(pal.GetArrayLength());
             foreach (var item in pal.EnumerateArray())
             {
@@ -131,24 +168,77 @@ public static class ProjectFile
                 palette.Add(item.GetString()!.ToUpperInvariant());
             }
 
-            if (!root.TryGetProperty("pixels", out var rows) || rows.ValueKind != JsonValueKind.Array
-                || rows.GetArrayLength() != height)
-            { error = $"pixels 必须是长度等于 height（{height}）的字符串数组。"; return null; }
-
-            var grid = new PixelGrid(width, height);
-            int y = 0;
-            foreach (var row in rows.EnumerateArray())
+            var layers = new List<Layer>();
+            var frames = new List<AnimationFrame>();
+            int active = 0;
+            int selectedFrame = 0, fps = 8;
+            if (version == 1)
             {
-                if (row.ValueKind != JsonValueKind.String || !ParseRow(row.GetString()!, width, grid, y))
-                {
-                    error = $"第 {y + 1} 行像素数据不合法（RLE 编码错误，或每行像素总数不等于 {width}）。";
-                    return null;
-                }
-                y++;
+                if (!root.TryGetProperty("pixels", out var rows) || !TryParseRows(rows, width, height, out var grid))
+                { error = "像素数据不合法。"; return null; }
+                layers.Add(new Layer("图层 1", grid!));
             }
-
-            return new LoadResult { Grid = grid, Palette = palette };
+            else if (version == 2)
+            {
+                if (!root.TryGetProperty("layers", out var entries) || entries.ValueKind != JsonValueKind.Array || entries.GetArrayLength() is < 1 or > 32)
+                { error = "图层数量必须为 1–32。"; return null; }
+                foreach (var entry in entries.EnumerateArray())
+                {
+                    if (entry.ValueKind != JsonValueKind.Object || !entry.TryGetProperty("name", out var name) || name.ValueKind != JsonValueKind.String
+                        || string.IsNullOrWhiteSpace(name.GetString()) || name.GetString()!.Length > 100
+                        || !entry.TryGetProperty("visible", out var visible) || visible.ValueKind is not (JsonValueKind.True or JsonValueKind.False)
+                        || !entry.TryGetProperty("pixels", out var rows) || !TryParseRows(rows, width, height, out var grid))
+                    { error = "图层数据不合法。"; return null; }
+                    layers.Add(new Layer(name.GetString()!, grid!, visible.GetBoolean()));
+                }
+                if (!root.TryGetProperty("activeLayer", out var selected) || selected.ValueKind != JsonValueKind.Number || !selected.TryGetInt32(out active) || active < 0 || active >= layers.Count)
+                { error = "当前图层索引不合法。"; return null; }
+            }
+            else
+            {
+                if (!root.TryGetProperty("frames", out var frameEntries) || frameEntries.ValueKind != JsonValueKind.Array || frameEntries.GetArrayLength() is < 1 or > MaxFrames ||
+                    !root.TryGetProperty("activeFrame", out var frameIndex) || frameIndex.ValueKind != JsonValueKind.Number || !frameIndex.TryGetInt32(out selectedFrame) || selectedFrame < 0 || selectedFrame >= frameEntries.GetArrayLength() ||
+                    !root.TryGetProperty("fps", out var rate) || rate.ValueKind != JsonValueKind.Number || !rate.TryGetInt32(out fps) || fps is < 1 or > 30)
+                { error = "动画帧或帧率不合法。"; return null; }
+                long pixelBudget = 0;
+                foreach (var frame in frameEntries.EnumerateArray())
+                {
+                    if (frame.ValueKind != JsonValueKind.Object || !frame.TryGetProperty("layers", out var entries) || entries.ValueKind != JsonValueKind.Array || entries.GetArrayLength() is < 1 or > 32 ||
+                        !frame.TryGetProperty("activeLayer", out var selected) || selected.ValueKind != JsonValueKind.Number || !selected.TryGetInt32(out int frameActive) || frameActive < 0 || frameActive >= entries.GetArrayLength())
+                    { error = "动画帧图层数据不合法。"; return null; }
+                    pixelBudget += (long)entries.GetArrayLength() * width * height;
+                    if (frameEntries.GetArrayLength() > 1 && pixelBudget > MaxAnimationPixels) { error = "动画帧总像素超过上限。"; return null; }
+                    var frameLayers = new List<Layer>();
+                    foreach (var entry in entries.EnumerateArray())
+                    {
+                        if (entry.ValueKind != JsonValueKind.Object || !entry.TryGetProperty("name", out var name) || name.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(name.GetString()) || name.GetString()!.Length > 100 ||
+                            !entry.TryGetProperty("visible", out var visible) || visible.ValueKind is not (JsonValueKind.True or JsonValueKind.False) ||
+                            !entry.TryGetProperty("pixels", out var rows) || !TryParseRows(rows, width, height, out var grid))
+                        { error = "动画帧图层数据不合法。"; return null; }
+                        frameLayers.Add(new Layer(name.GetString()!, grid!, visible.GetBoolean()));
+                    }
+                    frames.Add(new AnimationFrame(frameLayers, frameActive));
+                }
+                layers = frames[selectedFrame].Layers;
+                active = frames[selectedFrame].ActiveLayer;
+            }
+            if (frames.Count == 0) frames.Add(new AnimationFrame(layers, active));
+            return new LoadResult { Grid = layers[active].Grid, Palette = palette, Layers = layers, ActiveLayer = active, Frames = frames, ActiveFrame = selectedFrame, FramesPerSecond = fps };
         }
+    }
+
+    private static bool TryParseRows(JsonElement rows, int width, int height, out PixelGrid? grid)
+    {
+        grid = null;
+        if (rows.ValueKind != JsonValueKind.Array || rows.GetArrayLength() != height) return false;
+        var result = new PixelGrid(width, height);
+        int y = 0;
+        foreach (var row in rows.EnumerateArray())
+        {
+            if (row.ValueKind != JsonValueKind.String || !ParseRow(row.GetString()!, width, result, y++)) return false;
+        }
+        grid = result;
+        return true;
     }
 
     /// <summary>解析一行 RLE：形如 "3x00000000,2xFF0000FF"，所有 N 之和必须等于 width。</summary>

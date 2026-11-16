@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="PixelCanvas.Mcp/PixelCanvas.Mcp.csproj" />
+  <Project Path="PixelCanvas.Tests/PixelCanvas.Tests.csproj" />
+  <Project Path="PixelCanvas/PixelCanvas.csproj" />
+</Solution>

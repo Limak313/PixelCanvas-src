@@ -2,26 +2,50 @@
 
 ## 功能简介
 
-原生 Windows 桌面像素画工具（C# WinForms / .NET 8），免安装、双击即用：
+原生 Windows 桌面像素画工具（C# WinForms / .NET 10），支持桌面插件与本地 MCP：
 
-- 画布：默认 16×16；预设 8/16/32/64/128；支持自定义 4–256（可非正方形），透明格显示棋盘格。
-- 工具：画笔（B）、橡皮（E）、取色器（I）、油漆桶（G），画笔大小 1–4；画布上右键随时快速取色。
+- 画布：默认 32×32；预设 8/16/32/64/128/256/512；支持自定义 4–512（可非正方形），透明格显示棋盘格。
+- 工具：画笔（B）、橡皮（E）、取色器（I）、油漆桶（G）、渐变（D），以及直线、矩形、椭圆和选区；画笔大小 1–4，右键可快速取色。
+- 渐变：当前颜色为起始色，可设置结束色并交换两色；在连续同色区域内拖动确定方向和范围，支持镜像与撤销。
+- 本地 MCP：支持连接正在运行的画布或操作工程文件，配置和工具说明见 [MCP.md](MCP.md)。
 - 调色板：内置 32 色 DawnBringer（DB32）+ 自定义颜色（系统原生取色器）。
 - 对称绘制：水平镜像 / 垂直镜像独立开关，可同时开启（一点对称 4 点）。
-- 撤销 / 重做：Ctrl+Z / Ctrl+Y（或 Ctrl+Shift+Z），最多 100 步，一整笔一步。
-- 工程保存 / 载入：Ctrl+S / Ctrl+O，`.pxproj`（UTF-8 JSON，按行 RLE 像素编码）。
+- 图层：最多 32 层，支持新建、删除、调整顺序和显示 / 隐藏；隐藏的图层不能绘制。
+- 帧动画：底部可新增、复制、删除帧，导入同画布尺寸的 PNG、JPEG 或 BMP 作为新帧，并以 1–30 帧/秒循环播放；每帧拥有独立图层。最多 64 帧，多帧总图层像素不超过 1100 万。导入的半透明像素会转换为透明或不透明。
+- 动画时间轴：点击缩略图切换帧，拖动或使用左右按钮调整顺序（排序不可撤销）；可开启洋葱皮，以红色和蓝色显示前后帧。洋葱皮仅供编辑参考，播放及导出时不显示。
+- 精灵表：动画栏点击“精灵表”，设置每行帧数，按当前导出放大倍数将全部帧依次导出为透明 PNG 网格。
+- 导出预设：右侧“导出设置”可保存和复用 PNG、GIF、精灵表的缩放、GIF 帧率、精灵表列数及输出目录；按预设导出会创建新文件，GIF 预设帧率不修改工程帧率。
+- 颜色管理：可替换当前帧当前图层中的一种颜色（可撤销），并删除调色板颜色、保存及加载 `.pxpal` 色板；调色板随 `.pxproj` 工程保存。
+- 撤销 / 重做：Ctrl+Z / Ctrl+Y（或 Ctrl+Shift+Z），每个图层最多 100 步，一整笔一步；所有图层的历史共用 64 MiB 上限，超限时最早的记录会被移除。图层管理操作不可撤销。
+- 工程保存 / 载入：Ctrl+S / Ctrl+O，`.pxproj`（UTF-8 JSON，按行 RLE 像素编码）；多帧工程保存全部帧、图层和帧率，并可读取旧版单帧工程。旧版程序无法打开多帧工程。
+- 工程文件上限：128 MiB，调色板最多 1024 色；超限时会提示错误并保留现有文件。旧版工程同样适用此上限。
+- 自动保存与恢复：未保存的修改每分钟写入独立恢复副本；异常退出后下次启动可恢复，恢复后需手动保存工程。
+- 参考图：打开本地图片作为画布底图，可调整不透明度和显示状态；参考图不会保存在工程中或出现在导出的 PNG 中。
+- 沉浸画图：F11 进入或退出全屏画布，Esc 退出；F1 查看全部快捷键，F2 查看当前画布和工具状态。
 - 导出 PNG：1×–16× 最近邻放大，无网格线、透明背景保留。
+- 导出 GIF：多帧画布的导出对话框默认选择循环 GIF，保存到动画文件夹；支持透明背景和 1×–16× 最近邻放大。GIF 最多使用 255 种不透明颜色，超过时会量化。普通工程保存仍为可编辑的 `.pxproj`。
 - 其他：网格线开关、悬停笔刷高亮、整数倍自动缩放（高 DPI 支持）。
 
 ## 构建命令
 
-需要 .NET SDK（可在 [dotnet.microsoft.com](https://dotnet.microsoft.com) 下载，或 `winget install Microsoft.DotNet.SDK.8`）。
+需要 .NET 10 SDK（可在 [dotnet.microsoft.com](https://dotnet.microsoft.com) 下载，或 `winget install Microsoft.DotNet.SDK.10`）。版本号由根目录 `Directory.Build.props` 集中管理，桌面程序、MCP 服务与插件清单对齐。
+
+一键 Release 全量构建并运行核心测试（不含 `--ui` 交互分支）：
 
 ```powershell
-cd D:\像素画布\PixelCanvas
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+powershell -NoProfile -ExecutionPolicy Bypass -File .\构建与测试.ps1
+```
+
+或手动分步执行：
+
+```powershell
+# 全量构建解决方案（PixelCanvas / PixelCanvas.Mcp / PixelCanvas.Tests）
+dotnet build PixelCanvas.slnx -c Release
+
+# 运行工程文件错误处理等核心测试
+dotnet run --project PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release
 ```
 
 ## 运行方法
 
-双击 `D:\像素画布\PixelCanvas\publish\PixelCanvas.exe` 即可。自包含单文件发布，运行端无需安装 .NET；程序运行期间不进行任何网络访问。
+双击桌面的“PixelCanvas 新版”快捷方式，或运行仓库根目录的 `启动PixelCanvas.ps1`。快捷方式打开已安装的 PixelCanvas Desktop 插件所附带的画布，需安装 .NET 10 桌面运行时。本地 MCP 使用仅限当前用户的命名管道，不监听网络端口。
