@@ -532,6 +532,16 @@ public static class McpBridge
         }
     }
 
+    /// <summary>判断 reuse_info 响应是否对应尺寸匹配、未修改的空白可复用画布。</summary>
+    internal static bool MatchesReusable(JsonObject? reply, int width, int height)
+    {
+        var data = reply?["data"];
+        return reply?["ok"]?.GetValue<bool>() == true
+            && data?["reusable"]?.GetValue<bool>() == true
+            && data?["width"]?.GetValue<int>() == width
+            && data?["height"]?.GetValue<int>() == height;
+    }
+
     private static async Task<object> OpenCanvasAsync(JsonObject args)
     {
         int width = McpCanvas.Number(args, "width", 32), height = McpCanvas.Number(args, "height", 32);
@@ -550,8 +560,7 @@ public static class McpBridge
                 try
                 {
                     var reply = await CallCanvasAsync(candidate, "reuse_info", new JsonObject(), 1000).ConfigureAwait(false);
-                    var state = reply["data"];
-                    if (reply["ok"]?.GetValue<bool>() == true && state?["reusable"]?.GetValue<bool>() == true && state?["width"]?.GetValue<int>() == width && state?["height"]?.GetValue<int>() == height) matches.Add(candidate);
+                    if (MatchesReusable(reply, width, height)) matches.Add(candidate);
                 }
                 catch (Exception ex) when (ex is IOException or TimeoutException or OperationCanceledException or UnauthorizedAccessException) { }
             }
@@ -562,18 +571,41 @@ public static class McpBridge
         }
         if (!forceNew && _lastOpenedId > 0 && _lastOpenedWidth == width && _lastOpenedHeight == height && Environment.TickCount64 - _lastOpenedAt < 5000)
         {
+            JsonObject? check = null;
+            bool unreachable = false;
             try
             {
-                var previous = await CallCanvasAsync(_lastOpenedId, "info", new JsonObject(), 500).ConfigureAwait(false);
-                if (previous["ok"]?.GetValue<bool>() == true)
-                {
-                    var data = previous["data"];
-                    bool ready = data?["ready"]?.GetValue<bool>() != false;
-                    return new { processId = _lastOpenedId, ready, reused = true, canvas = data?.DeepClone() };
-                }
+                check = await CallCanvasAsync(_lastOpenedId, "reuse_info", new JsonObject(), 500).ConfigureAwait(false);
             }
-            catch (Exception ex) when (ex is IOException or TimeoutException or OperationCanceledException or UnauthorizedAccessException) { }
-            return new { processId = _lastOpenedId, ready = false, reused = true, message = "刚启动的画布尚未响应，请检查窗口，不要重复启动。" };
+            catch (Exception ex) when (ex is IOException or TimeoutException or OperationCanceledException or UnauthorizedAccessException)
+            {
+                unreachable = true;
+            }
+
+            if (unreachable)
+            {
+                return new { processId = _lastOpenedId, ready = false, reused = true, message = "刚启动的画布尚未响应，请检查窗口，不要重复启动。" };
+            }
+
+            bool reusable = MatchesReusable(check, width, height);
+
+            if (reusable)
+            {
+                try
+                {
+                    var previous = await CallCanvasAsync(_lastOpenedId, "info", new JsonObject(), 500).ConfigureAwait(false);
+                    if (previous["ok"]?.GetValue<bool>() == true)
+                    {
+                        var data = previous["data"];
+                        bool ready = data?["ready"]?.GetValue<bool>() != false;
+                        return new { processId = _lastOpenedId, ready, reused = true, canvas = data?.DeepClone() };
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or TimeoutException or OperationCanceledException or UnauthorizedAccessException) { }
+            }
+
+            // 缓存窗已被修改、尺寸不符或暂不可用：不复用，新开窗口。
+            forceNew = true;
         }
         string appPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "app", "PixelCanvas.exe"));
         if (!File.Exists(appPath)) throw new FileNotFoundException("找不到插件附带的 PixelCanvas 程序。", appPath);
