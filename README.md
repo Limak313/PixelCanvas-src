@@ -42,9 +42,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\构建与测试.ps1
 # 全量构建解决方案（PixelCanvas / PixelCanvas.Mcp / PixelCanvas.Tests）
 dotnet build PixelCanvas.slnx -c Release
 
-# 运行工程文件错误处理等核心测试
-dotnet run --project PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release
+# 运行 xUnit 核心测试（交互 UI 冒烟用例默认跳过）
+dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release
 ```
+
+测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、绘画算法、调色板为无头可运行的核心用例；`UiSmokeTests` 标记为跳过，需交互式桌面 STA 会话手动验证。
 
 ## 运行方法
 

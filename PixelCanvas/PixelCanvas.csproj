@@ -11,4 +11,8 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="PixelCanvas.Tests" />
+  </ItemGroup>
+
 </Project>

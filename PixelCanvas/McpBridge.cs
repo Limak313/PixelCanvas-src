@@ -240,7 +240,7 @@ public static class McpBridge
         return "pixelcanvas_draw";
     }
 
-    private static object ListTools()
+    internal static object ListTools()
     {
         var definitions = ToolDefinitions().Select(node => (JsonObject)node!).ToArray();
         var tools = definitions.GroupBy(d => ToolGroup(d["name"]!.GetValue<string>()))
@@ -292,7 +292,7 @@ public static class McpBridge
         return schema;
     }
 
-    private static async Task<object> CallToolAsync(JsonObject request)
+    internal static async Task<object> CallToolAsync(JsonObject request)
     {
         try
         {
