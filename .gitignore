@@ -12,7 +12,6 @@ PixelCanvas-Agent-*/
 
 # 运行产出目录
 output/
-input/
 
 # 临时文件
 *.tmp
