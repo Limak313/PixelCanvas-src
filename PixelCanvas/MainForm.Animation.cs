@@ -49,7 +49,7 @@ public sealed partial class MainForm
         _onionCheck.CheckedChanged += (_, _) => UpdateOnionSkin();
         bar.Controls.Add(_onionCheck);
         bar.Controls.Add(new Label { Text = "帧/秒", Width = 48, Height = 30, ForeColor = Color.FromArgb(205, 218, 234), TextAlign = ContentAlignment.MiddleLeft });
-        _fpsControl = new NumericUpDown { Minimum = 1, Maximum = 30, Value = 8, Width = 55, Margin = new Padding(0, 3, 0, 0), AccessibleName = "每秒帧数" };
+        _fpsControl = new NumericUpDown { Minimum = 1, Maximum = ProjectFile.MaxFps, Value = 8, Width = 55, Margin = new Padding(0, 3, 0, 0), AccessibleName = "每秒帧数" };
         _fpsControl.ValueChanged += (_, _) => { if (_updatingFrames) return; _fps = (int)_fpsControl.Value; _animationTimer.Interval = Math.Max(1, 1000 / _fps); SetDirty(); };
         bar.Controls.Add(_fpsControl);
         _animationTimer.Interval = 125;

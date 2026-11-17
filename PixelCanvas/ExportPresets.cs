@@ -31,7 +31,7 @@ internal static class ExportPresets
     {
         if (item is null || string.IsNullOrWhiteSpace(item.Name) || item.Name.Length > 60 || item.Name != item.Name.Trim()) throw new ArgumentException("预设名称须为 1–60 个字符且首尾不能有空格。");
         if (item.Format is not ("png" or "gif" or "sheet")) throw new ArgumentException("格式须为 png、gif 或 sheet。");
-        if (item.Scale is < 1 or > 16 || item.Fps is < 1 or > 30 || item.Columns is < 1 or > 64) throw new ArgumentException("缩放须为 1–16、帧率 1–30、列数 1–64。");
+        if (item.Scale is < 1 or > 16 || item.Fps is < 1 or > ProjectFile.MaxFps || item.Columns is < 1 or > 64) throw new ArgumentException($"缩放须为 1–16、帧率 1–{ProjectFile.MaxFps}、列数 1–64。");
         if (item.Directory is null || (item.Directory.Length > 0 && (!Path.IsPathFullyQualified(item.Directory) || (checkDirectory && !System.IO.Directory.Exists(item.Directory))))) throw new ArgumentException("输出目录必须是现有文件夹的绝对路径，或留空使用默认目录。");
     }
 

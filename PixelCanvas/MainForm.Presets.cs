@@ -24,7 +24,7 @@ public sealed partial class MainForm
         var format = new ComboBox { Left = 145, Top = 82, Width = 130, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "导出格式" };
         format.Items.AddRange(new object[] { "PNG 当前帧", "GIF 动画", "PNG 精灵表" }); format.SelectedIndex = 0;
         var scale = new NumericUpDown { Left = 145, Top = 116, Width = 130, Minimum = 1, Maximum = 16, Value = _scaleCombo.SelectedIndex >= 0 ? ExportScales[_scaleCombo.SelectedIndex] : 1, AccessibleName = "预设放大倍数" };
-        var fps = new NumericUpDown { Left = 145, Top = 150, Width = 130, Minimum = 1, Maximum = 30, Value = _fps, AccessibleName = "预设 GIF 帧率" };
+        var fps = new NumericUpDown { Left = 145, Top = 150, Width = 130, Minimum = 1, Maximum = ProjectFile.MaxFps, Value = _fps, AccessibleName = "预设 GIF 帧率" };
         var columns = new NumericUpDown { Left = 145, Top = 184, Width = 130, Minimum = 1, Maximum = 64, Value = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(_frames.Count))), AccessibleName = "预设精灵表列数" };
         var directory = new TextBox { Left = 145, Top = 218, Width = 238, AccessibleName = "预设输出目录" };
         var browse = new Button { Text = "选择…", Left = 390, Top = 216, Width = 60 };

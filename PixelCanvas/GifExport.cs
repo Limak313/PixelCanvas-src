@@ -7,7 +7,7 @@ internal static class GifExport
 {
     internal static void Save(string path, IReadOnlyList<AnimationFrame> frames, int fps, int scale)
     {
-        if (frames.Count is < 1 or > ProjectFile.MaxFrames || fps is < 1 or > 30 || scale is < 1 or > 16)
+        if (frames.Count is < 1 or > ProjectFile.MaxFrames || fps is < 1 or > ProjectFile.MaxFps || scale is < 1 or > 16)
             throw new ArgumentException("帧数、帧率或缩放倍数不合法。");
         var grid = frames[0].Layers[0].Grid;
         int width = grid.Width * scale, height = grid.Height * scale;

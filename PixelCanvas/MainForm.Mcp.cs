@@ -234,9 +234,9 @@ public sealed partial class MainForm
     private object BatchFramesFromMcp(JsonObject args)
     {
         if (args["frames"] is not JsonArray specs || specs.Count is < 1 or > 32) throw new ArgumentException("frames 须包含 1–32 帧。");
-        if (_frames.Count + specs.Count > ProjectFile.MaxFrames) throw new ArgumentException("动画最多支持 64 帧。");
+        if (_frames.Count + specs.Count > ProjectFile.MaxFrames) throw new ArgumentException($"动画最多支持 {ProjectFile.MaxFrames} 帧。");
         int fps = McpCanvas.Number(args, "fps", _fps);
-        if (fps is < 1 or > 30) throw new ArgumentException("帧率必须为 1–30。");
+        if (fps is < 1 or > ProjectFile.MaxFps) throw new ArgumentException($"帧率必须为 1–{ProjectFile.MaxFps}。");
         long total = _frames.Sum(f => (long)f.Layers.Count * _grid.Width * _grid.Height);
         int operationCount = 0, pixelCount = 0;
         var staged = new List<AnimationFrame>();
@@ -318,7 +318,7 @@ public sealed partial class MainForm
     {
         if (args["playing"] is not JsonValue value || !value.TryGetValue<bool>(out bool playing)) throw new ArgumentException("playing 必须是布尔值。");
         int fps = McpCanvas.Number(args, "fps", _fps);
-        if (fps is < 1 or > 30) throw new ArgumentException("帧率必须为 1–30。");
+        if (fps is < 1 or > ProjectFile.MaxFps) throw new ArgumentException($"帧率必须为 1–{ProjectFile.MaxFps}。");
         if (_fps != fps) _fpsControl.Value = fps;
         if (_playing != playing) ToggleAnimation();
         return new { ok = true, data = FrameStatusFromMcp() };

@@ -1034,7 +1034,7 @@ public sealed partial class MainForm : Form
         try
         {
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            if (stream.Length > ProjectFile.MaxFileBytes) throw new IOException("工程文件超过 128 MiB 上限。");
+            if (stream.Length > ProjectFile.MaxFileBytes) throw new IOException($"工程文件超过 {ProjectFile.MaxFileBytes / 1024 / 1024} MiB 上限。");
             return SHA256.HashData(stream);
         }
         catch (FileNotFoundException) { return null; }

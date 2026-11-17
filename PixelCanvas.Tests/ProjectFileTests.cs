@@ -151,7 +151,7 @@ public class ProjectFileTests
             file.SetLength(ProjectFile.MaxFileBytes + 1);
 
         Assert.Null(ProjectFile.TryLoad(path, out var error));
-        Assert.Contains("超过 128 MiB", error, StringComparison.Ordinal);
+        Assert.Contains($"超过 {ProjectFile.MaxFileBytes / 1024 / 1024} MiB", error, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -267,5 +267,113 @@ public class ProjectFileTests
 
         Assert.Null(ProjectFile.TryLoad(path, out var error));
         Assert.Contains("动画帧或帧率不合法", error, StringComparison.Ordinal);
+    }
+
+    private static List<AnimationFrame> MakeFrames(int count)
+    {
+        var frames = new List<AnimationFrame>();
+        for (int i = 0; i < count; i++)
+            frames.Add(new AnimationFrame(new List<Layer> { new($"f{i}", new PixelGrid(4, 4)) }));
+        return frames;
+    }
+
+    [Fact]
+    public void SaveLoad_Animation_AtMaxFrames_RoundTrips()
+    {
+        using var dir = new TempDir();
+        var path = dir.File("max-frames.pxproj");
+        var frames = MakeFrames(ProjectFile.MaxFrames);
+        ProjectFile.Save(path, frames[0].Layers, 0, new[] { "ABCDEF" },
+            frames: frames, activeFrame: ProjectFile.MaxFrames - 1, framesPerSecond: 12);
+
+        var loaded = ProjectFile.TryLoad(path, out var error);
+        Assert.NotNull(loaded);
+        Assert.Equal(ProjectFile.MaxFrames, loaded!.Frames.Count);
+        Assert.Equal("", error);
+    }
+
+    [Fact]
+    public void Save_TooManyFrames_Rejected()
+    {
+        using var dir = new TempDir();
+        var path = dir.File("too-many.pxproj");
+        var frames = MakeFrames(ProjectFile.MaxFrames + 1);
+
+        Assert.Throws<ArgumentException>(() => ProjectFile.Save(path, frames[0].Layers, 0, new[] { "ABCDEF" },
+            frames: frames, activeFrame: 0, framesPerSecond: 12));
+    }
+
+    [Fact]
+    public void Load_TooManyFrames_Rejected()
+    {
+        using var dir = new TempDir();
+        var path = dir.File("bad-count.pxproj");
+        var frames = Enumerable.Range(0, ProjectFile.MaxFrames + 1)
+            .Select(_ => new { layers = new[] { new { name = "f", visible = true, pixels = new[] { "1x00000000" } } }, activeLayer = 0 })
+            .ToArray();
+        File.WriteAllText(path, JsonSerializer.Serialize(new
+        {
+            format = ProjectFile.FormatName,
+            version = 3,
+            width = 1,
+            height = 1,
+            palette = new[] { "ABCDEF" },
+            frames,
+            activeFrame = 0,
+            fps = 12
+        }));
+
+        Assert.Null(ProjectFile.TryLoad(path, out var error));
+        Assert.Contains("动画帧", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SaveLoad_Animation_AtMaxFps_RoundTrips()
+    {
+        using var dir = new TempDir();
+        var path = dir.File("max-fps.pxproj");
+        var frames = MakeFrames(2);
+        ProjectFile.Save(path, frames[0].Layers, 0, new[] { "ABCDEF" },
+            frames: frames, activeFrame: 0, framesPerSecond: ProjectFile.MaxFps);
+
+        var loaded = ProjectFile.TryLoad(path, out var error);
+        Assert.NotNull(loaded);
+        Assert.Equal(ProjectFile.MaxFps, loaded!.FramesPerSecond);
+        Assert.Equal("", error);
+    }
+
+    [Fact]
+    public void Save_FpsAboveLimit_Rejected()
+    {
+        using var dir = new TempDir();
+        var path = dir.File("bad-fps-save.pxproj");
+        var frames = MakeFrames(2);
+
+        Assert.Throws<ArgumentException>(() => ProjectFile.Save(path, frames[0].Layers, 0, new[] { "ABCDEF" },
+            frames: frames, activeFrame: 0, framesPerSecond: ProjectFile.MaxFps + 1));
+    }
+
+    [Fact]
+    public void Load_FpsAboveLimit_Rejected()
+    {
+        using var dir = new TempDir();
+        var path = dir.File("bad-fps-load.pxproj");
+        var frames = Enumerable.Range(0, 2)
+            .Select(_ => new { layers = new[] { new { name = "f", visible = true, pixels = new[] { "1x00000000" } } }, activeLayer = 0 })
+            .ToArray();
+        File.WriteAllText(path, JsonSerializer.Serialize(new
+        {
+            format = ProjectFile.FormatName,
+            version = 3,
+            width = 1,
+            height = 1,
+            palette = new[] { "ABCDEF" },
+            frames,
+            activeFrame = 0,
+            fps = ProjectFile.MaxFps + 1
+        }));
+
+        Assert.Null(ProjectFile.TryLoad(path, out var error));
+        Assert.Contains("动画帧", error, StringComparison.Ordinal);
     }
 }

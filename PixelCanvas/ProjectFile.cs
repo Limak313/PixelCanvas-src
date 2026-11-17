@@ -12,11 +12,12 @@ public static class ProjectFile
 
     /// <summary>实现保护上限：载入时宽/高超过该值直接拒绝，防止异常文件耗尽内存。</summary>
     public const int MaxSide = 1024;
-    public const long MaxFileBytes = 128L * 1024 * 1024;
+    public const long MaxFileBytes = 256L * 1024 * 1024;
     public const int MaxPaletteColors = 1024;
-    public const int MaxFrames = 64;
+    public const int MaxFrames = 128;
+    public const int MaxFps = 60;
     // 保留 JSON/RLE 体积余量，确保多帧作品最坏情况下仍能低于文件上限。
-    public const long MaxAnimationPixels = 11_000_000;
+    public const long MaxAnimationPixels = 22_000_000;
 
     public sealed class LoadResult
     {
@@ -68,7 +69,7 @@ public static class ProjectFile
     {
         if (palette.Count is < 1 or > MaxPaletteColors) throw new ArgumentException($"调色板颜色数量必须为 1–{MaxPaletteColors}。");
         var grid = layers[activeLayer].Grid;
-        if (frames is not null && (frames.Count is < 1 or > MaxFrames || activeFrame < 0 || activeFrame >= frames.Count || framesPerSecond is < 1 or > 30 ||
+        if (frames is not null && (frames.Count is < 1 or > MaxFrames || activeFrame < 0 || activeFrame >= frames.Count || framesPerSecond is < 1 or > MaxFps ||
             (frames.Count > 1 && frames.Sum(f => (long)f.Layers.Count * grid.Width * grid.Height) > MaxAnimationPixels) ||
             frames.Any(f => f.Layers.Count is < 1 or > 32 || f.ActiveLayer < 0 || f.ActiveLayer >= f.Layers.Count || f.Layers.Any(l => l.Grid.Width != grid.Width || l.Grid.Height != grid.Height))))
             throw new ArgumentException("动画帧、图层、尺寸或帧率超出支持范围。");
@@ -85,7 +86,7 @@ public static class ProjectFile
             fps = animation ? framesPerSecond : null,
         };
         string json = JsonSerializer.Serialize(dto);
-        if (Encoding.UTF8.GetByteCount(json) > MaxFileBytes) throw new IOException("工程文件超过 128 MiB 上限，无法保存。");
+        if (Encoding.UTF8.GetByteCount(json) > MaxFileBytes) throw new IOException($"工程文件超过 {MaxFileBytes / 1024 / 1024} MiB 上限，无法保存。");
         string tmp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try { File.WriteAllText(tmp, json); File.Move(tmp, path, overwrite); }
         catch { try { if (File.Exists(tmp)) File.Delete(tmp); } catch { } throw; }
@@ -133,7 +134,7 @@ public static class ProjectFile
         try
         {
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-            if (stream.Length > MaxFileBytes) { error = "工程文件超过 128 MiB 上限。"; return null; }
+            if (stream.Length > MaxFileBytes) { error = $"工程文件超过 {MaxFileBytes / 1024 / 1024} MiB 上限。"; return null; }
             doc = JsonDocument.Parse(stream);
         }
         catch (JsonException ex) { error = "不是有效的 JSON：" + ex.Message; return null; }
@@ -198,7 +199,7 @@ public static class ProjectFile
             {
                 if (!root.TryGetProperty("frames", out var frameEntries) || frameEntries.ValueKind != JsonValueKind.Array || frameEntries.GetArrayLength() is < 1 or > MaxFrames ||
                     !root.TryGetProperty("activeFrame", out var frameIndex) || frameIndex.ValueKind != JsonValueKind.Number || !frameIndex.TryGetInt32(out selectedFrame) || selectedFrame < 0 || selectedFrame >= frameEntries.GetArrayLength() ||
-                    !root.TryGetProperty("fps", out var rate) || rate.ValueKind != JsonValueKind.Number || !rate.TryGetInt32(out fps) || fps is < 1 or > 30)
+                    !root.TryGetProperty("fps", out var rate) || rate.ValueKind != JsonValueKind.Number || !rate.TryGetInt32(out fps) || fps is < 1 or > MaxFps)
                 { error = "动画帧或帧率不合法。"; return null; }
                 long pixelBudget = 0;
                 foreach (var frame in frameEntries.EnumerateArray())
