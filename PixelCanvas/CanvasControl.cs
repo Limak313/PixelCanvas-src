@@ -312,7 +312,8 @@ public sealed class CanvasControl : Control
         var dest = new Rectangle(0, 0, _grid.Width * _zoom, _grid.Height * _zoom);
 
         g.InterpolationMode = InterpolationMode.NearestNeighbor;   // 最近邻：像素锐利
-        g.PixelOffsetMode = PixelOffsetMode.Half;
+        g.PixelOffsetMode = PixelOffsetMode.None;                  // 整数像素对齐，避免半像素边缘发虚
+        g.SmoothingMode = SmoothingMode.None;                      // 网格线/选区关闭抗锯齿
 
         // 1) 透明格棋盘格
         g.FillRectangle(GetCheckerBrush(), dest);
