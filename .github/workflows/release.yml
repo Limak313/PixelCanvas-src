@@ -68,13 +68,19 @@ jobs:
           $assets = [Environment]::NewLine + [Environment]::NewLine + "---" + [Environment]::NewLine + `
             "Windows x64 / arm64：``PixelCanvas-$version-win-x64-setup.exe`` 与 ``PixelCanvas-$version-win-arm64-setup.exe`` 为自包含安装包（各约 52 MB，无需预装 .NET，安装到当前用户目录并创建开始菜单与桌面快捷方式）；``PixelCanvas-$version-<rid>-slim.zip`` 为免安装精简包（需对应架构的 .NET 10 桌面运行时）；``PixelCanvas-Agent-$version-<rid>.zip`` 为自包含免安装包；``pixelcanvas-plugin-$version.zip`` 为 Agent 插件（x64）。无头核心测试、Linux MCP 冒烟、覆盖率下限与格式门禁已在 CI 通过。"
           Set-Content release-notes.md ($section + $assets) -Encoding utf8
-          gh release create $tag `
-            --title "PixelCanvas $version" `
-            --notes-file release-notes.md `
-            "PixelCanvas-$version-win-x64-setup.exe" `
-            "PixelCanvas-$version-win-arm64-setup.exe" `
-            "PixelCanvas-$version-win-x64-slim.zip" `
-            "PixelCanvas-$version-win-arm64-slim.zip" `
-            "PixelCanvas-Agent-$version-win-x64.zip" `
-            "PixelCanvas-Agent-$version-win-arm64.zip" `
+          $files = @(
+            "PixelCanvas-$version-win-x64-setup.exe"
+            "PixelCanvas-$version-win-arm64-setup.exe"
+            "PixelCanvas-$version-win-x64-slim.zip"
+            "PixelCanvas-$version-win-arm64-slim.zip"
+            "PixelCanvas-Agent-$version-win-x64.zip"
+            "PixelCanvas-Agent-$version-win-arm64.zip"
             "pixelcanvas-plugin-$version.zip"
+          )
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release edit $tag --title "PixelCanvas $version" --notes-file release-notes.md
+            gh release upload $tag $files --clobber
+          } else {
+            gh release create $tag --title "PixelCanvas $version" --notes-file release-notes.md $files
+          }
