@@ -27,6 +27,7 @@
 - 9 条界面路径冒烟用例不再靠 `Skip` 沉底：整类标记 `[Trait("Category","UI")]`，CI 门禁与 `构建与测试.ps1` 默认按标签排除，本机 `-Ui`（或 `--filter "Category=UI"`）一键执行；实测 69 条全通过（60 无头 + 9 界面）。
 - 新增 UI 宿主探针（`Category=UiHost`）：在 CI runner 上实测可创建 `MainForm` 句柄、可建画布控件句柄并 `DrawToBitmap`。
 - 据探针结果分级迁移：7 条只依赖窗体句柄的界面用例改标 `Category=UiHost` 进入 CI 门禁，仅播放定时器（`FrameHistory_SwitchFrameUndoAndPlayback`）与时间轴拖拽（`AnimationFrames_OnionSkin_ReorderAndTimelineDrag`）保留 `Category=UI` 在本机执行。
+- 关闭 xUnit 测试集合并行（`xunit.runner.json`）：`ExportTests` 与 `UiSmokeTests` 都会改写进程级 `PIXELCANVAS_OUTPUT_DIR`，并行时会出现拿到另一个临时目录的断言竞态（CI 首跑即暴露）；改串行后连跑稳定。
 
 ### 工程化
 - 插件目录名随版本改为 `pixelcanvas-desktop-v1036`，市场清单路径同步。
