@@ -2,9 +2,9 @@
 
   <!-- 解决方案统一版本号：桌面程序、MCP 服务与插件清单（plugin.json）对齐此版本。 -->
   <PropertyGroup>
-    <Version>1.0.42</Version>
-    <AssemblyVersion>1.0.42.0</AssemblyVersion>
-    <FileVersion>1.0.42.0</FileVersion>
+    <Version>1.0.43</Version>
+    <AssemblyVersion>1.0.43.0</AssemblyVersion>
+    <FileVersion>1.0.43.0</FileVersion>
   </PropertyGroup>
 
 </Project>

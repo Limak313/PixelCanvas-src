@@ -18,6 +18,8 @@ Codex 桌面插件使用其自身的插件管理方式；独立部署包与 Code
 
 分组描述只列出“用途 + 动作名 + 示例”，完整参数与限制统一由 `pixelcanvas_tool_info` 提供，避免 `tools/list` 携带全部 78 段说明。省略 `canvas_` / `project_` 前缀的写法在唯一匹配时可直接使用（如 `export_svg`）；多义时（如 `export_png` 同时属于画布与磁盘工程）会返回候选，要求带完整前缀。选错分组时会提示动作实际所属的工具，拼错动作时会给出最接近的候选。
 
+Windows 下提供完整 8 个分组工具。Linux/macOS 没有实时画布宿主，`tools/list` 只返回 `pixelcanvas_project` 与 `pixelcanvas_tool_info`，`tool_info` 的枚举也只包含 `project_*` 动作；直接调用实时画布工具仍会得到明确的 Windows 平台错误，不会静默失败。
+
 要一次查询多个操作，可传 `{"actions":["canvas_reference_info","canvas_import_frame","canvas_export_png"]}`，最多 32 个，结果按请求顺序返回。`action` 与 `actions` 不能同时提供；有未知名称时整次查询返回错误。
 
 当前工程与绘画采用二值透明：导入帧时 alpha 小于 128 的像素变为透明，其余变为不透明；读取工程时 alpha 为 0 视为透明，其他值视为不透明，保存时只写入 00 或 FF。PNG 导出不能保留半透明像素，手工写入半透明 `.pxproj` 也不能绕过此限制。需要精确保留半透明时，应保留原始图像并在支持完整 alpha 的工具中处理。

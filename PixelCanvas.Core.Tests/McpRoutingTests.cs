@@ -8,10 +8,14 @@ namespace PixelCanvas.Tests;
 public class McpRoutingTests
 {
     [Fact]
-    public void ListsEightGroupedTools()
+    public void ListsPlatformAppropriateTools()
     {
         var advertised = JsonSerializer.SerializeToNode(McpBridge.ListTools())!["tools"]!.AsArray();
-        Assert.Equal(8, advertised.Count);
+        var names = advertised.Select(t => t!["name"]!.GetValue<string>()).ToArray();
+        var expected = OperatingSystem.IsWindows()
+            ? new[] { "pixelcanvas_canvas", "pixelcanvas_layers", "pixelcanvas_settings", "pixelcanvas_animation", "pixelcanvas_draw", "pixelcanvas_files", "pixelcanvas_project", "pixelcanvas_tool_info" }
+            : new[] { "pixelcanvas_project", "pixelcanvas_tool_info" };
+        Assert.Equal(expected.OrderBy(n => n), names.OrderBy(n => n));
     }
 
     [Fact]
@@ -23,22 +27,31 @@ public class McpRoutingTests
     }
 
     [Fact]
+    public async Task ToolInfo_LiveCanvasActionRejectedOnHeadless()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var node = await McpTestHost.InvokeAsync("pixelcanvas_tool_info", new { action = "canvas_info" });
+        Assert.True(McpTestHost.IsError(node));
+        Assert.Contains("Windows", McpTestHost.Text(node));
+    }
+
+    [Fact]
     public async Task ToolInfo_Batch_ReturnsInRequestOrder()
     {
-        var node = await McpTestHost.InvokeAsync("pixelcanvas_tool_info", new { actions = new[] { "project_info", "canvas_info" } });
+        var node = await McpTestHost.InvokeAsync("pixelcanvas_tool_info", new { actions = new[] { "project_info", "project_export_png" } });
         var defs = JsonNode.Parse(McpTestHost.Text(node))!.AsArray();
         Assert.False(McpTestHost.IsError(node));
         Assert.Equal(2, defs.Count);
         Assert.Equal("project_info", defs[0]!["name"]!.GetValue<string>());
-        Assert.Equal("canvas_info", defs[1]!["name"]!.GetValue<string>());
+        Assert.Equal("project_export_png", defs[1]!["name"]!.GetValue<string>());
     }
 
     [Fact]
     public async Task ToolInfo_PrefixlessAliasResolves()
     {
-        var node = await McpTestHost.InvokeAsync("pixelcanvas_tool_info", new { action = "export_svg" });
+        var node = await McpTestHost.InvokeAsync("pixelcanvas_tool_info", new { action = "create" });
         Assert.False(McpTestHost.IsError(node));
-        Assert.Contains("canvas_export_svg", McpTestHost.Text(node));
+        Assert.Contains("project_create", McpTestHost.Text(node));
     }
 
     [Fact]
@@ -143,13 +156,15 @@ public class McpRoutingTests
     {
         var tools = JsonSerializer.SerializeToNode(McpBridge.ListTools())!["tools"]!.AsArray()
             .Select(t => t!.AsObject()).ToArray();
-        Assert.Equal(8, tools.Length);
+        Assert.Equal(OperatingSystem.IsWindows() ? 8 : 2, tools.Length);
 
-        var expectedGroups = new[]
-        {
-            "pixelcanvas_canvas", "pixelcanvas_animation", "pixelcanvas_draw", "pixelcanvas_files",
-            "pixelcanvas_layers", "pixelcanvas_project", "pixelcanvas_settings"
-        };
+        var expectedGroups = OperatingSystem.IsWindows()
+            ? new[]
+            {
+                "pixelcanvas_canvas", "pixelcanvas_animation", "pixelcanvas_draw", "pixelcanvas_files",
+                "pixelcanvas_layers", "pixelcanvas_project", "pixelcanvas_settings"
+            }
+            : new[] { "pixelcanvas_project" };
         var groups = tools.Where(t => t["name"]!.GetValue<string>() != "pixelcanvas_tool_info").ToArray();
         Assert.Equal(expectedGroups.OrderBy(n => n), groups.Select(t => t["name"]!.GetValue<string>()).OrderBy(n => n));
 
@@ -166,8 +181,9 @@ public class McpRoutingTests
             Assert.False(schema["additionalProperties"]!.GetValue<bool>());
         }
 
-        Assert.Equal(78, advertised.Count);
-        Assert.Equal(78, advertised.Distinct().Count());
+        int expectedActionCount = OperatingSystem.IsWindows() ? 78 : 16;
+        Assert.Equal(expectedActionCount, advertised.Count);
+        Assert.Equal(expectedActionCount, advertised.Distinct().Count());
         var toolInfo = tools.Single(t => t["name"]!.GetValue<string>() == "pixelcanvas_tool_info");
         var lookup = toolInfo["inputSchema"]!["properties"]!["action"]!["enum"]!.AsArray().Select(n => n!.GetValue<string>()).ToArray();
         Assert.Equal(advertised.OrderBy(n => n), lookup.OrderBy(n => n));

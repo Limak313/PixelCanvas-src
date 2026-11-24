@@ -55,7 +55,14 @@ try:
 
     tools = call(2, "tools/list", {})["tools"]
     names = {tool["name"] for tool in tools}
-    assert {"pixelcanvas_project", "pixelcanvas_canvas"} <= names, names
+    assert names == {"pixelcanvas_project", "pixelcanvas_tool_info"}, names
+    project_tool = next(tool for tool in tools if tool["name"] == "pixelcanvas_project")
+    actions = project_tool["inputSchema"]["properties"]["action"]["enum"]
+    assert actions and all(action.startswith("project_") for action in actions), actions
+
+    info = next(tool for tool in tools if tool["name"] == "pixelcanvas_tool_info")
+    info_actions = set(info["inputSchema"]["properties"]["action"]["enum"])
+    assert info_actions == set(actions), (info_actions, actions)
 
     project = os.path.join(work, "smoke.pxproj")
     created = call(3, "tools/call", {
@@ -83,6 +90,13 @@ try:
     })
     assert guarded.get("isError"), guarded
     assert "Windows" in guarded["content"][0]["text"], guarded
+
+    info_guard = call(6, "tools/call", {
+        "name": "pixelcanvas_tool_info",
+        "arguments": {"action": "canvas_info"},
+    })
+    assert info_guard.get("isError"), info_guard
+    assert "Windows" in info_guard["content"][0]["text"], info_guard
 
     print(f"MCP smoke OK: {len(names)} tools, PNG {width}x{height}, realtime canvas guarded")
 finally:

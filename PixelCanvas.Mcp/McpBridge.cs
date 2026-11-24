@@ -157,7 +157,9 @@ public static class McpBridge
         {
             protocolVersion = version, capabilities = new { tools = new { listChanged = false } },
             serverInfo = new { name = "pixelcanvas", version = ServerVersion() },
-            instructions = "本地画布使用 process_id 区分窗口；图层索引从底部 0 开始。文件绘制保存到新的输出文件，不覆盖源文件。"
+            instructions = OperatingSystem.IsWindows()
+                ? "本地画布使用 process_id 区分窗口；图层索引从底部 0 开始。文件绘制保存到新的输出文件，不覆盖源文件。"
+                : "当前平台没有实时画布窗口，仅提供 pixelcanvas_project 的 project_* 磁盘工程动作；实时画布及 pixelcanvas_canvas / layers / settings / animation / draw / files 仅支持 Windows。"
         };
     }
 
@@ -273,9 +275,17 @@ public static class McpBridge
         _ => ("", "")
     };
 
+    private static bool IsLiveCanvasAction(string name) => ToolGroup(name) != "pixelcanvas_project";
+
+    // 非 Windows 没有实时画布宿主，只暴露可直接操作 .pxproj 的工程动作。
+    private static JsonObject[] AvailableDefinitions()
+        => ToolDefinitions().Select(node => (JsonObject)node!)
+            .Where(d => OperatingSystem.IsWindows() || !IsLiveCanvasAction(d["name"]!.GetValue<string>()))
+            .ToArray();
+
     internal static object ListTools()
     {
-        var definitions = ToolDefinitions().Select(node => (JsonObject)node!).ToArray();
+        var definitions = AvailableDefinitions();
         var tools = definitions.GroupBy(d => ToolGroup(d["name"]!.GetValue<string>()))
             .Select(group =>
             {
@@ -425,22 +435,22 @@ public static class McpBridge
                 {
                     if (args.ContainsKey("action") || args["actions"] is not JsonArray actions || actions.Count is < 1 or > 32)
                         throw new ArgumentException("请提供 action 或 1–32 个 actions，不能同时提供。");
-                    var definitions = ToolDefinitions();
+                    var definitions = AvailableDefinitions();
                     var result = new JsonArray();
                     foreach (var item in actions)
                     {
                         if (item is not JsonValue value || !value.TryGetValue<string>(out string? action) || string.IsNullOrEmpty(action))
                             throw new ArgumentException("actions 必须包含有效的操作名称。");
                         string resolved = ResolveAction(null, action);
-                        var matched = definitions.FirstOrDefault(d => d!["name"]!.GetValue<string>() == resolved)
-                            ?? throw new ArgumentException($"未知操作：{action}。");
+                        var matched = definitions.FirstOrDefault(d => d["name"]!.GetValue<string>() == resolved)
+                            ?? throw new ArgumentException($"动作 {resolved} 需要实时画布窗口，仅支持 Windows；当前平台可用 project_* 动作。");
                         result.Add(matched.DeepClone());
                     }
                     return new { content = new[] { new { type = "text", text = result.ToJsonString(JsonOptions) } }, isError = false };
                 }
                 string operation = ResolveAction(null, McpCanvas.Text(args, "action"));
-                var definition = ToolDefinitions().FirstOrDefault(d => d!["name"]!.GetValue<string>() == operation)
-                    ?? throw new ArgumentException("未知操作。");
+                var definition = AvailableDefinitions().FirstOrDefault(d => d["name"]!.GetValue<string>() == operation)
+                    ?? throw new ArgumentException($"动作 {operation} 需要实时画布窗口，仅支持 Windows；当前平台可用 project_* 动作。");
                 return new { content = new[] { new { type = "text", text = definition.ToJsonString(JsonOptions) } }, isError = false };
             }
             if (name.StartsWith("pixelcanvas_", StringComparison.Ordinal))
