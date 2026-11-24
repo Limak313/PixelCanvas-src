@@ -55,20 +55,20 @@ try:
 
     tools = call(2, "tools/list", {})["tools"]
     names = {tool["name"] for tool in tools}
-    assert "project_create" in names and "open_canvas" in names, names
+    assert {"pixelcanvas_project", "pixelcanvas_canvas"} <= names, names
 
     project = os.path.join(work, "smoke.pxproj")
     created = call(3, "tools/call", {
-        "name": "project_create",
-        "arguments": {"path": project, "width": 8, "height": 8},
+        "name": "pixelcanvas_project",
+        "arguments": {"action": "project_create", "arguments": {"path": project, "width": 8, "height": 8}},
     })
     assert not created.get("isError"), created
     assert os.path.isfile(project), "工程文件未生成"
 
     png = os.path.join(work, "smoke.png")
     exported = call(4, "tools/call", {
-        "name": "project_export_png",
-        "arguments": {"path": project, "output_path": png, "scale": 2},
+        "name": "pixelcanvas_project",
+        "arguments": {"action": "project_export_png", "arguments": {"path": project, "output_path": png, "scale": 2}},
     })
     assert not exported.get("isError"), exported
     with open(png, "rb") as handle:
@@ -77,7 +77,10 @@ try:
     width, height = struct.unpack(">II", header[16:24])
     assert (width, height) == (16, 16), (width, height)
 
-    guarded = call(5, "tools/call", {"name": "open_canvas", "arguments": {}})
+    guarded = call(5, "tools/call", {
+        "name": "pixelcanvas_canvas",
+        "arguments": {"action": "open_canvas", "arguments": {}},
+    })
     assert guarded.get("isError"), guarded
     assert "Windows" in guarded["content"][0]["text"], guarded
 
