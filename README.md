@@ -56,7 +56,7 @@ dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release
 powershell -NoProfile -ExecutionPolicy Bypass -File .\打包本地MCP.ps1
 ```
 
-- 包名默认按 `Directory.Build.props` 的版本号生成（如 `PixelCanvas-Agent-1.0.35-win-x64`）；可用 `-PackageName` 覆盖。
+- 包名默认按 `Directory.Build.props` 的版本号生成（如 `PixelCanvas-Agent-1.0.36-win-x64`）；可用 `-PackageName` 覆盖。
 - 默认会把 Release 产物同步刷新到插件目录 `pixelcanvas-plugin\plugins\pixelcanvas-desktop-v*\app` 与 `server`（排除 pdb）；`-NoPlugin` 可跳过刷新，`-NoPackage` 只刷新插件不生成部署包。
 - 生成的部署包目录、`.zip`、`output/` 均在 `.gitignore` 中，不纳入版本管理。
 - 部署包产出后，可用 `pixelcanvas-batch-check.ps1 -PackageRoot <部署包目录>` 做一次跨进程 MCP 绘画与读取校验。
