@@ -605,6 +605,8 @@ public static class McpBridge
 
     private static async Task<object> OpenCanvasAsync(JsonObject args)
     {
+        if (!OperatingSystem.IsWindows())
+            throw new InvalidOperationException("实时画布宿主仅支持 Windows；当前平台可使用 project_* 文件工具与无头导出。");
         int width = McpCanvas.Number(args, "width", 32), height = McpCanvas.Number(args, "height", 32);
         if (width is < 4 or > 512 || height is < 4 or > 512) throw new ArgumentException("画布宽高必须为 4–512 的整数。");
         bool forceNew = args["force_new"]?.GetValue<bool>() ?? false;
@@ -668,15 +670,25 @@ public static class McpBridge
             // 缓存窗已被修改、尺寸不符或暂不可用：不复用，新开窗口。
             forceNew = true;
         }
-        string appPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "app", "PixelCanvas.exe"));
-        if (!File.Exists(appPath)) throw new FileNotFoundException("找不到插件附带的 PixelCanvas 程序。", appPath);
+        string appFile = OperatingSystem.IsWindows() ? "PixelCanvas.exe" : "PixelCanvas";
+        string appPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "app", appFile));
+        if (!File.Exists(appPath)) throw new FileNotFoundException("找不到插件附带的 PixelCanvas 程序；当前平台可改用 project_* 文件工具。", appPath);
         string bundledRuntime = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "runtime"));
-        bool hasBundledRuntime = File.Exists(Path.Combine(bundledRuntime, "dotnet.exe"));
+        string runtimeHost = OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet";
+        bool hasBundledRuntime = File.Exists(Path.Combine(bundledRuntime, runtimeHost));
         var startInfo = new ProcessStartInfo(appPath) { UseShellExecute = !hasBundledRuntime, WorkingDirectory = Path.GetDirectoryName(appPath)! };
         if (hasBundledRuntime)
         {
-            startInfo.Environment["DOTNET_ROOT_X64"] = bundledRuntime;
+            string arch = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture switch
+            {
+                System.Runtime.InteropServices.Architecture.X64 => "X64",
+                System.Runtime.InteropServices.Architecture.Arm64 => "ARM64",
+                System.Runtime.InteropServices.Architecture.X86 => "X86",
+                System.Runtime.InteropServices.Architecture.Arm => "ARM",
+                _ => ""
+            };
             startInfo.Environment["DOTNET_ROOT"] = bundledRuntime;
+            if (arch.Length > 0) startInfo.Environment["DOTNET_ROOT_" + arch] = bundledRuntime;
             startInfo.Environment["DOTNET_MULTILEVEL_LOOKUP"] = "0";
         }
         startInfo.ArgumentList.Add(width.ToString(System.Globalization.CultureInfo.InvariantCulture));

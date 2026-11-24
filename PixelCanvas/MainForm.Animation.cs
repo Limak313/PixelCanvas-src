@@ -264,7 +264,7 @@ public sealed partial class MainForm
         if (ext is not (".png" or ".jpg" or ".jpeg" or ".bmp")) throw new ArgumentException("仅支持 PNG、JPEG 或 BMP 图片。");
         if (!CanAddFrame(1)) throw new InvalidOperationException("已达到动画帧或总像素上限。");
         using var source = Image.FromFile(path);
-        var frame = AnimationFrame.FromImage(source, _grid.Width, _grid.Height);
+        var frame = ImageImport.FrameFromImage(source, _grid.Width, _grid.Height);
         SyncCurrentFrame();
         frame.Layers[0].SetHistoryBudget(_historyBudget);
         RecordStructure();

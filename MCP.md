@@ -2,6 +2,8 @@
 
 PixelCanvas 提供本地标准输入 / 输出（stdio）MCP 服务。连接正在运行的画布时，服务通过只允许当前 Windows 用户访问的命名管道通信，不监听网络端口。
 
+服务本身是跨平台的 `net10.0` 宿主。Windows 上可连接实时画布并使用全部工具；Linux/macOS 上可直接使用 `project_*` 工程文件工具、GIF/SVG/PNG/精灵表/序列帧导出与路径查询，调用 `open_canvas` / `create_artwork` 等实时画布入口会返回「实时画布宿主仅支持 Windows」的明确错误，而不是启动失败。
+
 ## 启动
 
 使用独立部署包时，运行包内 `生成客户端配置.ps1`，将生成的 `mcp-config.json` 中 `pixelcanvas` 服务合并到客户端配置。命令为包内 `runtime\dotnet.exe`，参数为包内 `server\PixelCanvas.Mcp.dll` 的绝对路径。客户端负责启动和停止 MCP 服务，不需要长期打开终端。其他客户端的配置位置和具体格式以其自身说明为准。
@@ -73,10 +75,16 @@ Codex 桌面插件使用其自身的插件管理方式；独立部署包与 Code
 
 ## 编译和发布
 
-在仓库根目录构建桌面程序与 MCP 服务（需安装 .NET 10 SDK）：
+在仓库根目录构建无头 MCP 服务（需安装 .NET 10 SDK，Windows/Linux/macOS 均可）：
 
-```powershell
+```bash
 dotnet build PixelCanvas.Mcp/PixelCanvas.Mcp.csproj -c Release
+```
+
+桌面程序仍需 Windows：`dotnet build PixelCanvas/PixelCanvas.csproj -c Release`。无头核心测试可在任意平台运行：
+
+```bash
+dotnet test PixelCanvas.Core.Tests/PixelCanvas.Core.Tests.csproj -c Release
 ```
 
 ### 批量绘画与保存导出
@@ -89,4 +97,4 @@ dotnet build PixelCanvas.Mcp/PixelCanvas.Mcp.csproj -c Release
 
 `open_canvas` 和 `create_artwork` 可设置 `reuse_existing=true`，复用新版软件中尺寸相同、未修改、未命名的单帧单层空白画布。没有可复用窗口时新建；多个候选时返回 `candidates`，可再次调用并指定 `process_id`。指定窗口不可用时返回错误，不自动替换目标。明确要求新窗口时 `open_canvas` 可使用 `force_new=true`，不可与复用同时使用。组合工具在实际绘制前再次检查状态与尺寸，以保护期间被修改的画布。
 
-默认产出根目录：`D:\像素画布\output`；单帧和多帧 `.pxproj` 工程放入 `工程`，普通 PNG 放入 `PNG`，GIF 和精灵表 PNG 放入 `动画`。相应保存和导出对话框使用这些默认目录；已有工程的普通保存仍使用原路径。MCP 在新工程或导出操作省略输出路径时自动生成唯一文件名，并在结果中返回实际路径。指定路径及导出预设中指定的目录优先，不覆盖已有输出。可通过绝对路径环境变量 `PIXELCANVAS_OUTPUT_DIR` 覆盖输出**根目录**；例如设置为 `D:\像素出图`，PNG 会写入 `D:\像素出图\PNG`，不要将变量设置为 `PNG` 子目录。其他电脑没有该工作区时使用“文档\PixelCanvas\output”。运行中画布沿用自身启动时的环境变量，修改服务配置不会改变已打开的画布；需从新服务启动新画布。工程文件操作则使用服务进程的环境变量。
+默认产出根目录优先级：`PIXELCANVAS_OUTPUT_DIR` 环境变量 > 当前目录含 `PixelCanvas.slnx` 时使用其下 `output` > 用户文档目录的 `PixelCanvas\output`。单帧和多帧 `.pxproj` 工程放入 `工程`，普通 PNG 放入 `PNG`，GIF 和精灵表 PNG 放入 `动画`。相应保存和导出对话框使用这些默认目录；已有工程的普通保存仍使用原路径。MCP 在新工程或导出操作省略输出路径时自动生成唯一文件名，并在结果中返回实际路径。指定路径及导出预设中指定的目录优先，不覆盖已有输出。可通过绝对路径环境变量 `PIXELCANVAS_OUTPUT_DIR` 覆盖输出**根目录**；例如设置为 `D:\像素出图`，PNG 会写入 `D:\像素出图\PNG`，不要将变量设置为 `PNG` 子目录。运行中画布沿用自身启动时的环境变量，修改服务配置不会改变已打开的画布；需从新服务启动新画布。工程文件操作则使用服务进程的环境变量。

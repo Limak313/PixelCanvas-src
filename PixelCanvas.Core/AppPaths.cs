@@ -11,14 +11,15 @@ internal static class AppPaths
     public static string LocalAppDataRoot =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ProductName);
 
-    /// <summary>工程/图片默认输出根目录：环境变量 &gt; 工作区 output &gt; 文档 output。</summary>
+    /// <summary>工程/图片默认输出根目录：环境变量 &gt; 开发工作区 output &gt; 文档 output。</summary>
     public static string OutputRoot
     {
         get
         {
             string? configured = Environment.GetEnvironmentVariable(OutputDirEnv);
             if (!string.IsNullOrWhiteSpace(configured) && Path.IsPathFullyQualified(configured)) return configured;
-            if (Directory.Exists(@"D:\像素画布")) return @"D:\像素画布\output";
+            string workspace = Environment.CurrentDirectory;
+            if (File.Exists(Path.Combine(workspace, "PixelCanvas.slnx"))) return Path.Combine(workspace, "output");
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), ProductName, "output");
         }
     }

@@ -1,7 +1,3 @@
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
-using System.Runtime.InteropServices;
-
 namespace PixelCanvas;
 
 internal static class SpriteSheetExport
@@ -23,27 +19,23 @@ internal static class SpriteSheetExport
             throw new ArgumentException("精灵表尺寸超过上限（边长 16384、总像素 16777216），请减少列数或放大倍数。");
         if (frames.Any(frame => frame.Layers.Count == 0 || frame.Layers.Any(layer => layer.Grid.Width != grid.Width || layer.Grid.Height != grid.Height)))
             throw new ArgumentException("动画帧尺寸不一致。");
-        using var sheet = new Bitmap(width, height, PixelFormat.Format32bppArgb);
-        using (var graphics = Graphics.FromImage(sheet))
+
+        var sheet = new int[width * height];   // 默认 0 = 透明
+        var framePixels = new int[grid.Width * grid.Height];
+        for (int i = 0; i < frames.Count; i++)
         {
-            graphics.CompositingMode = CompositingMode.SourceCopy;
-            graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
-            graphics.PixelOffsetMode = PixelOffsetMode.Half;
-            graphics.Clear(Color.Transparent);
-            using var image = new Bitmap(grid.Width, grid.Height, PixelFormat.Format32bppArgb);
-            var pixels = new int[grid.Width * grid.Height];
-            for (int i = 0; i < frames.Count; i++)
+            Array.Clear(framePixels);
+            foreach (var layer in frames[i].Layers) if (layer.Visible)
+                for (int j = 0; j < framePixels.Length; j++) if (layer.Grid.RawPixels[j] != Argb.Transparent) framePixels[j] = layer.Grid.RawPixels[j];
+            int left = i % columns * frameWidth, top = i / columns * frameHeight;
+            for (int y = 0; y < frameHeight; y++)
             {
-                Array.Clear(pixels);
-                foreach (var layer in frames[i].Layers) if (layer.Visible)
-                    for (int j = 0; j < pixels.Length; j++) if (layer.Grid.RawPixels[j] != Argb.Transparent) pixels[j] = layer.Grid.RawPixels[j];
-                var data = image.LockBits(new Rectangle(0, 0, grid.Width, grid.Height), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
-                try { Marshal.Copy(pixels, 0, data.Scan0, pixels.Length); } finally { image.UnlockBits(data); }
-                graphics.DrawImage(image, new Rectangle(i % columns * frameWidth, i / columns * frameHeight, frameWidth, frameHeight),
-                    new Rectangle(0, 0, grid.Width, grid.Height), GraphicsUnit.Pixel);
+                int sourceRow = y / scale * grid.Width;
+                int targetRow = (top + y) * width + left;
+                for (int x = 0; x < frameWidth; x++) sheet[targetRow + x] = framePixels[sourceRow + x / scale];
             }
         }
-        AtomicFile.Write(path, stream => sheet.Save(stream, ImageFormat.Png), overwrite);
+        PngExport.Save(path, sheet, width, height, 1, overwrite);
         return new Layout(columns, rows, frameWidth, frameHeight, width, height, frames.Count, scale);
     }
 }

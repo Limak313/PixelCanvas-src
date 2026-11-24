@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../PixelCanvas/PixelCanvas.csproj" />
+    <ProjectReference Include="../PixelCanvas.Mcp/PixelCanvas.Mcp.csproj" />
   </ItemGroup>
 
 </Project>

@@ -16,6 +16,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\PixelCanvas.Core\PixelCanvas.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="PixelCanvas.Tests" />
   </ItemGroup>
 

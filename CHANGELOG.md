@@ -4,6 +4,17 @@
 
 ## [未发布]
 
+### 变更
+- 架构拆分：新增 `PixelCanvas.Core`（`net10.0`），迁入像素模型、工程读写、撤销历史、GIF/SVG/PNG/精灵表/序列帧导出、预设、路径与 MCP 画布模型共 24 个文件；`PixelCanvas.Mcp` 同步改为 `net10.0`，只引用 Core，不再依赖 WinForms。Windows 桌面界面保持原样。
+- 核心库去掉 `System.Drawing`：PNG 改为手写 RGBA8 编码（CRC32 + `ZLibStream`），精灵表改为像素数组拼装后复用同一编码器；GIF/SVG 仍为手写编码。核心库因此可在 Linux/macOS 构建。
+- 输出根目录不再写死 `D:\像素画布`：优先 `PIXELCANVAS_OUTPUT_DIR`，其次当前目录含 `PixelCanvas.slnx` 时使用 `output`，否则回退到用户文档目录的 `PixelCanvas\output`。
+- MCP 实时画布宿主在非 Windows 平台直接返回明确错误，文件级 `project_*` 工具与无头导出仍可用；启动路径与运行时目录改为按平台和架构推导，不再只认 x64。
+
+### 工程化
+- 测试按依赖拆分：新增 `PixelCanvas.Core.Tests`（`net10.0`，可在 Linux 运行，75 条），`PixelCanvas.Tests` 保留界面与位图相关用例（40 条 + 2 条 UI）。合计 117 条，本机全通过。
+- CI 新增 Linux job：在 `ubuntu-latest` 构建 Core / MCP 并运行核心测试；Windows job 与发布门禁改为运行整个解决方案的测试。
+- 当前基线：门禁 115 条，覆盖率行 58.0%、分支 38.2%（CI 下限仍为 55% / 38%）。
+
 ## [1.0.39] - 2026-11-24
 
 ### 新增

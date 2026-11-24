@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 跨平台核心：模型、工程读写、历史、导出与预设，不引用 WinForms / System.Drawing。 -->
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>PixelCanvas.Core</AssemblyName>
+    <RootNamespace>PixelCanvas</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="PixelCanvas" />
+    <InternalsVisibleTo Include="PixelCanvas.Mcp" />
+    <InternalsVisibleTo Include="PixelCanvas.Tests" />
+    <InternalsVisibleTo Include="PixelCanvas.Core.Tests" />
+  </ItemGroup>
+
+</Project>

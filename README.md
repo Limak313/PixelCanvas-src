@@ -2,7 +2,7 @@
 
 ## 功能简介
 
-原生 Windows 桌面像素画工具（C# WinForms / .NET 10），支持桌面插件与本地 MCP：
+原生 Windows 桌面像素画工具（C# WinForms / .NET 10），核心逻辑与无头 MCP 服务为跨平台 `net10.0` 库，可在 Linux/macOS 构建并运行文件级工具与导出；实时画布宿主仍依赖 Windows 桌面：
 
 - 画布：默认 32×32；预设 8/16/32/64/128/256/512；支持自定义 4–512（可非正方形），透明格显示棋盘格。
 - 工具：画笔（B）、橡皮（E）、取色器（I）、油漆桶（G）、渐变（D），以及直线、矩形、椭圆和选区；画笔大小 1–4，右键可快速取色。
@@ -67,17 +67,22 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\构建与测试.ps1 -Cover
 或手动分步执行：
 
 ```powershell
-# 全量构建解决方案（PixelCanvas / PixelCanvas.Mcp / PixelCanvas.Tests）
+# 全量构建解决方案（PixelCanvas.Core / PixelCanvas.Mcp / PixelCanvas / 两个测试项目）
 dotnet build PixelCanvas.slnx -c Release
 
-# 运行无头核心测试（排除 UI 组）
-dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Category!=UI"
+# 运行全部无头测试（Core 75 条 + Windows 40 条，排除 UI 组）
+dotnet test PixelCanvas.slnx -c Release --filter "Category!=UI"
+
+# 只跑核心库测试（Linux/macOS 上可单独执行这一条）
+dotnet test PixelCanvas.Core.Tests/PixelCanvas.Core.Tests.csproj -c Release
 
 # 运行交互式 UI 冒烟组（需桌面会话；150% 缩放下才能复现高 DPI 路径）
 dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Category=UI"
 ```
 
-测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、原子写入、撤销历史落盘、绘画算法、调色板为无头可运行的核心用例；`UiSmokeTests` 的 9 条界面路径用例按环境依赖分两组：7 条只要求能创建窗体句柄，标 `Category=UiHost`，随默认门禁进入 CI；2 条依赖播放定时器消息泵与时间轴坐标映射（`FrameHistory_SwitchFrameUndoAndPlayback`、`AnimationFrames_OnionSkin_ReorderAndTimelineDrag`），标 `Category=UI`，在本机用 `-Ui` 执行。`FrameUndoTests`、`LayerUndoTests` 与 `UiHostProbeTests` 同属 `Category=UiHost`，分别覆盖帧与图层的结构撤销、以及运行环境能否承载界面用例；`UndoJournalTests` 为无头用例，覆盖撤销历史落盘的栈序还原、拒绝不匹配文件与步数截断；`ExportFormatsTests` 与 `McpExportFormatTests` 覆盖 SVG 色块合并、序列帧命名与缩放、非空目录拒绝，以及新增导出动作的 MCP 路由；`McpRoutingTests` 锁住「每个操作只属于一个分组入口、`tool_info` 枚举为并集」。当前门禁 115 条，本机 UI 组 2 条。覆盖率由 coverlet 采集：当前行覆盖 **62.3%**（2488/3996 行）、分支 **43.4%**；CI 对行 55% / 分支 38% 设下限，低于下限即失败。
+项目分层：`PixelCanvas.Core`（`net10.0`，像素模型、工程读写、撤销历史、GIF/SVG/PNG/精灵表/序列帧导出、路径与 MCP 画布模型，不引用 System.Drawing）；`PixelCanvas.Mcp`（`net10.0`，stdio MCP 宿主，文件级 `project_*` 工具与无头导出可跨平台，`open_canvas` 在非 Windows 返回明确错误）；`PixelCanvas`（`net10.0-windows` + WinForms 桌面界面）；`PixelCanvas.Core.Tests`（`net10.0`，可在 Linux CI 运行）；`PixelCanvas.Tests`（`net10.0-windows`，界面与位图相关用例）。
+
+测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、原子写入、撤销历史落盘、绘画算法、调色板为无头可运行的核心用例；`UiSmokeTests` 的 9 条界面路径用例按环境依赖分两组：7 条只要求能创建窗体句柄，标 `Category=UiHost`，随默认门禁进入 CI；2 条依赖播放定时器消息泵与时间轴坐标映射（`FrameHistory_SwitchFrameUndoAndPlayback`、`AnimationFrames_OnionSkin_ReorderAndTimelineDrag`），标 `Category=UI`，在本机用 `-Ui` 执行。`FrameUndoTests`、`LayerUndoTests` 与 `UiHostProbeTests` 同属 `Category=UiHost`，分别覆盖帧与图层的结构撤销、以及运行环境能否承载界面用例；`UndoJournalTests` 为无头用例，覆盖撤销历史落盘的栈序还原、拒绝不匹配文件与步数截断；`ExportFormatsTests` 与 `McpExportFormatTests` 覆盖 SVG 色块合并、序列帧命名与缩放、非空目录拒绝，以及新增导出动作的 MCP 路由；`McpRoutingTests` 锁住「每个操作只属于一个分组入口、`tool_info` 枚举为并集」。当前门禁 115 条（Core 75 + Windows 40），本机 UI 组 2 条。覆盖率由 coverlet 采集：当前行覆盖 **58.0%**、分支 **38.2%**；CI 对行 55% / 分支 38% 设下限，低于下限即失败。
 
 ## 安装（最终用户）
 
