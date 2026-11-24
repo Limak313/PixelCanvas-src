@@ -1,0 +1,6 @@
+root = true
+
+[*.cs]
+# 保留既有紧凑写法：对象/匿名类型初始化器不强制换行
+csharp_new_line_before_members_in_object_initializers = false
+csharp_new_line_before_members_in_anonymous_types = false

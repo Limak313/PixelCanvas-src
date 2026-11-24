@@ -100,8 +100,11 @@ internal static class McpCanvas
     internal static object Info(IReadOnlyList<Layer> layers, int active, int frameCount = 1, int activeFrame = 0, int fps = 8, bool playing = false)
     {
         var grid = layers[active].Grid;
-        return new { width = grid.Width, height = grid.Height, activeLayer = active, frameCount, activeFrame, fps, playing,
-            layers = layers.Select((l, i) => new { index = i, name = l.Name, visible = l.Visible }).ToArray() };
+        return new
+        {
+            width = grid.Width, height = grid.Height, activeLayer = active, frameCount, activeFrame, fps, playing,
+            layers = layers.Select((l, i) => new { index = i, name = l.Name, visible = l.Visible }).ToArray()
+        };
     }
 
     internal static object Read(JsonObject args, IReadOnlyList<Layer> layers, int active)
@@ -187,7 +190,9 @@ internal static class McpCanvas
         if (!layer.Visible) throw new ArgumentException("不能修改隐藏图层。");
         var tool = Text(args, "shape") switch
         {
-            "line" => ToolKind.Line, "rectangle" => ToolKind.Rectangle, "ellipse" => ToolKind.Ellipse,
+            "line" => ToolKind.Line,
+            "rectangle" => ToolKind.Rectangle,
+            "ellipse" => ToolKind.Ellipse,
             _ => throw new ArgumentException("shape 必须为 line、rectangle 或 ellipse。"),
         };
         int x1 = Number(args, "x1"), y1 = Number(args, "y1"), x2 = Number(args, "x2"), y2 = Number(args, "y2");
@@ -292,26 +297,13 @@ internal static class McpCanvas
 
     internal static void ExportPng(string path, IReadOnlyList<Layer> layers, int scale, bool overwrite = false)
     {
-        if (scale is < 1 or > 16) throw new ArgumentException("放大倍数必须为 1–16。");
         var grid = layers[0].Grid;
-        int width = grid.Width * scale, height = grid.Height * scale;
-        if ((long)width * height > 16_777_216) throw new ArgumentException("导出图片超过 16777216 像素，请降低放大倍数。");
-        int[] pixels = new int[grid.Width * grid.Height];
-        foreach (var layer in layers)
-        {
-            if (!layer.Visible) continue;
-            for (int i = 0; i < pixels.Length; i++) if (layer.Grid.RawPixels[i] != Argb.Transparent) pixels[i] = layer.Grid.RawPixels[i];
-        }
-        using var native = new Bitmap(grid.Width, grid.Height, PixelFormat.Format32bppArgb);
-        var bits = native.LockBits(new Rectangle(0, 0, native.Width, native.Height), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
-        try { Marshal.Copy(pixels, 0, bits.Scan0, pixels.Length); } finally { native.UnlockBits(bits); }
-        using var image = new Bitmap(width, height, PixelFormat.Format32bppArgb);
-        using (var g = Graphics.FromImage(image))
-        {
-            g.InterpolationMode = InterpolationMode.NearestNeighbor;
-            g.PixelOffsetMode = PixelOffsetMode.Half;
-            g.DrawImage(native, new Rectangle(0, 0, width, height), new Rectangle(0, 0, native.Width, native.Height), GraphicsUnit.Pixel);
-        }
-        AtomicFile.Write(path, stream => image.Save(stream, ImageFormat.Png), overwrite);
+        PngExport.Save(path, FrameComposite.Flatten(layers, grid.Width, grid.Height), grid.Width, grid.Height, scale, overwrite);
+    }
+
+    internal static int ExportSvg(string path, IReadOnlyList<Layer> layers, bool overwrite = false)
+    {
+        var grid = layers[0].Grid;
+        return SvgExport.Save(path, FrameComposite.Flatten(layers, grid.Width, grid.Height), grid.Width, grid.Height, overwrite);
     }
 }

@@ -75,6 +75,7 @@ public sealed partial class MainForm
         Add("删除", "删除当前帧（至少保留一帧）", DeleteAnimationFrame);
         Add("导入图", "将与画布同尺寸的图片导入为新帧", ImportAnimationFrame, 76);
         Add("精灵表", "将所有帧按网格导出为 PNG", ExportSpriteSheet, 76);
+        Add("序列帧", "将全部帧逐张导出为 PNG 序列到新目录", ExportFrameSequence, 76);
         Add("←", "将当前帧左移（可撤销）", () => MoveAnimationFrame(_activeFrame, _activeFrame - 1), 38);
         Add("→", "将当前帧右移（可撤销）", () => MoveAnimationFrame(_activeFrame, _activeFrame + 1), 38);
         _playButton = Add("播放", "循环播放或停止动画", ToggleAnimation);
@@ -227,6 +228,33 @@ public sealed partial class MainForm
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or OverflowException or System.Runtime.InteropServices.ExternalException)
         { MessageBox.Show(this, "精灵表导出失败：" + ex.Message, "导出精灵表", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+    }
+
+    /// <summary>逐帧导出 PNG 序列：自动在动画目录下新建唯一子目录，不覆盖既有文件。</summary>
+    private void ExportFrameSequence()
+    {
+        if (_playing || _canvas.InteractionInProgress) return;
+        try
+        {
+            SyncCurrentFrame();
+            int scale = _scaleCombo.SelectedIndex >= 0 ? ExportScales[_scaleCombo.SelectedIndex] : 1;
+            string baseName = Path.GetFileNameWithoutExtension(_projectPath) ?? "pixel-art";
+            if (string.IsNullOrWhiteSpace(baseName)) baseName = "pixel-art";
+            string root = OutputPaths.DirectoryPath(".png", animation: true);
+            string directory = Path.Combine(root, $"{Sanitize(baseName)}-序列帧-{DateTime.Now:HHmmss}");
+            int suffix = 2;
+            while (Directory.Exists(directory)) directory = Path.Combine(root, $"{Sanitize(baseName)}-序列帧-{DateTime.Now:HHmmss}-{suffix++}");
+            var result = FrameSequenceExport.Save(directory, "frame", _frames, scale);
+            MessageBox.Show(this, $"{result.FrameCount} 帧（{result.Width}×{result.Height}，{scale}×）已导出：\n{directory}", "导出序列帧", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or OverflowException or System.Runtime.InteropServices.ExternalException)
+        { MessageBox.Show(this, "序列帧导出失败：" + ex.Message, "导出序列帧", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+
+        static string Sanitize(string name)
+        {
+            foreach (char c in Path.GetInvalidFileNameChars()) name = name.Replace(c, '-');
+            return name.Trim().Length == 0 ? "pixel-art" : name.Trim();
+        }
     }
 
     private void ImportAnimationFrameFromPath(string path)

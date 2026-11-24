@@ -77,6 +77,12 @@ public static class McpBridge
     private static readonly JsonObject CanvasLayerSchema = Schema("""
         {"type":"object","properties":{"process_id":{"type":"integer"},"layer":{"type":"integer","description":"从 0 开始，默认为当前图层"}},"additionalProperties":false}
         """);
+    private static readonly JsonObject SvgExportSchema = Schema("""
+        {"type":"object","properties":{"process_id":{"type":"integer"},"path":{"type":"string","description":"不存在的 .svg 绝对路径；省略使用默认产出目录"}},"additionalProperties":false}
+        """);
+    private static JsonObject FrameSequenceSchema() => Schema("""
+        {"type":"object","properties":{"process_id":{"type":"integer"},"directory":{"type":"string","description":"不存在或空目录的绝对路径，脚本会在此写 frame-001.png…"},"base_name":{"type":"string","description":"文件基名，默认 frame；不能含路径分隔符"},"scale":{"type":"integer","minimum":1,"maximum":16}},"required":["directory"],"additionalProperties":false}
+        """);
     static McpBridge()
     {
         void AddMirror(JsonNode properties)
@@ -147,12 +153,17 @@ public static class McpBridge
     {
         string? requested = args?["protocolVersion"]?.GetValue<string>();
         string version = requested is "2025-11-25" or "2025-06-18" or "2025-03-26" or "2024-11-05" ? requested : "2025-06-18";
-        return new { protocolVersion = version, capabilities = new { tools = new { listChanged = false } },
+        return new
+        {
+            protocolVersion = version, capabilities = new { tools = new { listChanged = false } },
             serverInfo = new { name = "pixelcanvas", version = ServerVersion() },
-            instructions = "本地画布使用 process_id 区分窗口；图层索引从底部 0 开始。文件绘制保存到新的输出文件，不覆盖源文件。" };
+            instructions = "本地画布使用 process_id 区分窗口；图层索引从底部 0 开始。文件绘制保存到新的输出文件，不覆盖源文件。"
+        };
     }
 
-    private static object LegacyTools() => new { tools = new object[] {
+    private static object LegacyTools() => new
+    {
+        tools = new object[] {
         new { name = "open_canvas", description = "打开画布；reuse_existing=true 时可复用同尺寸未修改的空白窗口，多个候选需指定 process_id；force_new 新建。", inputSchema = Schema("{\"type\":\"object\",\"properties\":{\"width\":{\"type\":\"integer\",\"minimum\":4,\"maximum\":512},\"height\":{\"type\":\"integer\",\"minimum\":4,\"maximum\":512},\"force_new\":{\"type\":\"boolean\"},\"reuse_existing\":{\"type\":\"boolean\"},\"process_id\":{\"type\":\"integer\",\"minimum\":1}},\"additionalProperties\":false}") },
         new { name = "create_artwork", description = "新开画布或复用未修改的空白画布、建立图层、批量绘画并保存为新工程；失败返回已完成阶段及窗口 ID。", inputSchema = CreateArtworkSchema() },
         new { name = "list_canvases", description = "列出本机运行中的 PixelCanvas 窗口及进程 ID。", inputSchema = Schema("{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}") },
@@ -209,6 +220,8 @@ public static class McpBridge
         new { name = "canvas_export_png", description = "将运行中的画布导出到新的 PNG 文件。", inputSchema = CanvasOutputSchema },
         new { name = "canvas_export_gif", description = "将当前画布全部帧导出为循环 GIF；默认保存到动画文件夹。", inputSchema = CanvasOutputSchema },
         new { name = "canvas_export_sprite_sheet", description = "将当前画布全部帧按从左到右、从上到下排列为透明 PNG 精灵表；返回布局信息。", inputSchema = SpriteSheetSchema(false) },
+        new { name = "canvas_export_svg", description = "将当前帧的可见图层导出为 SVG 矢量色块（相邻同色像素合并为矩形，透明留空），不随缩放失真。", inputSchema = SvgExportSchema },
+        new { name = "canvas_export_frame_sequence", description = "将全部帧按顺序导出为 PNG 序列（frame-001.png…）到一个新的空目录；用于游戏引擎逐帧素材。", inputSchema = FrameSequenceSchema() },
         new { name = "canvas_export_presets_list", description = "列出本机共享的导出预设。", inputSchema = InfoSchema },
         new { name = "canvas_export_presets_put", description = "新增导出预设；替换同名预设须明确传入 overwrite=true。", inputSchema = Schema("{\"type\":\"object\",\"properties\":{\"process_id\":{\"type\":\"integer\"},\"name\":{\"type\":\"string\"},\"format\":{\"type\":\"string\",\"enum\":[\"png\",\"gif\",\"sheet\"]},\"scale\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":16},\"fps\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":60},\"columns\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":64},\"directory\":{\"type\":\"string\",\"description\":\"输出目录绝对路径，空字符串使用默认目录\"},\"overwrite\":{\"type\":\"boolean\"}},\"required\":[\"name\",\"format\"],\"additionalProperties\":false}") },
         new { name = "canvas_export_presets_delete", description = "删除指定预设；需明确确认。", inputSchema = Schema("{\"type\":\"object\",\"properties\":{\"process_id\":{\"type\":\"integer\"},\"name\":{\"type\":\"string\"},\"confirm\":{\"type\":\"boolean\"}},\"required\":[\"name\",\"confirm\"],\"additionalProperties\":false}") },
@@ -229,7 +242,8 @@ public static class McpBridge
         new { name = "project_export_png", description = "导出工程可见图层到新的 PNG 文件。", inputSchema = FileExportSchema() },
         new { name = "project_export_gif", description = "将工程全部帧导出为循环 GIF；默认保存到动画文件夹。", inputSchema = GifExportSchema() },
         new { name = "project_export_sprite_sheet", description = "将工程全部帧导出为透明 PNG 精灵表；返回布局信息。", inputSchema = SpriteSheetSchema(true) },
-    } };
+    }
+    };
 
     // Keep the original names callable for existing clients, while advertising a smaller
     // set of grouped tools. The schema lookup exposes the exact original contracts.
@@ -240,9 +254,9 @@ public static class McpBridge
     {
         if (name.StartsWith("project_", StringComparison.Ordinal)) return "pixelcanvas_project";
         if (name is "open_canvas" or "list_canvases" or "create_artwork" or "canvas_info" or "canvas_resize") return "pixelcanvas_canvas";
+        if (name.Contains("export") || name.Contains("save") || name == "canvas_open_project") return "pixelcanvas_files";
         if (name.Contains("frame") || name is "canvas_set_playback" or "canvas_set_onion_skin") return "pixelcanvas_animation";
         if (name.Contains("layer") || name.Contains("selection") || name is "canvas_undo" or "canvas_redo") return "pixelcanvas_layers";
-        if (name.Contains("export") || name.Contains("save") || name == "canvas_open_project") return "pixelcanvas_files";
         if (name.Contains("reference") || name.Contains("view") || name.Contains("options") || name.Contains("palette")) return "pixelcanvas_settings";
         return "pixelcanvas_draw";
     }
@@ -251,24 +265,34 @@ public static class McpBridge
     {
         var definitions = ToolDefinitions().Select(node => (JsonObject)node!).ToArray();
         var tools = definitions.GroupBy(d => ToolGroup(d["name"]!.GetValue<string>()))
-            .Select(group => new {
+            .Select(group => new
+            {
                 name = group.Key,
                 description = "按 action 执行操作；参数放入 arguments。调用 pixelcanvas_tool_info 查询操作的完整参数和限制。操作：" +
                     string.Join("；", group.Select(d => d["name"]!.GetValue<string>() + "：" + d["description"]!.GetValue<string>())),
-                inputSchema = new JsonObject {
+                inputSchema = new JsonObject
+                {
                     ["type"] = "object",
-                    ["properties"] = new JsonObject {
+                    ["properties"] = new JsonObject
+                    {
                         ["action"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray(group.Select(d => (JsonNode?)JsonValue.Create(d["name"]!.GetValue<string>())).ToArray()) },
                         ["arguments"] = new JsonObject { ["type"] = "object", ["description"] = "操作参数；先通过 pixelcanvas_tool_info 查询精确格式。" }
                     },
                     ["required"] = new JsonArray("action", "arguments"), ["additionalProperties"] = false
                 }
             }).Cast<object>().ToList();
-        tools.Add(new { name = "pixelcanvas_tool_info", description = "查询一个 action 或一组 actions 的完整参数 schema；二者只能提供一个，批量最多 32 个。", inputSchema = new JsonObject {
-            ["type"] = "object", ["properties"] = new JsonObject { ["action"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray(definitions.Select(d => (JsonNode?)JsonValue.Create(d["name"]!.GetValue<string>())).ToArray()) },
-                ["actions"] = new JsonObject { ["type"] = "array", ["minItems"] = 1, ["maxItems"] = 32, ["items"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray(definitions.Select(d => (JsonNode?)JsonValue.Create(d["name"]!.GetValue<string>())).ToArray()) } } },
-            ["oneOf"] = new JsonArray(new JsonObject { ["required"] = new JsonArray("action") }, new JsonObject { ["required"] = new JsonArray("actions") }), ["additionalProperties"] = false
-        } });
+        tools.Add(new
+        {
+            name = "pixelcanvas_tool_info", description = "查询一个 action 或一组 actions 的完整参数 schema；二者只能提供一个，批量最多 32 个。", inputSchema = new JsonObject
+            {
+                ["type"] = "object", ["properties"] = new JsonObject
+                {
+                    ["action"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray(definitions.Select(d => (JsonNode?)JsonValue.Create(d["name"]!.GetValue<string>())).ToArray()) },
+                    ["actions"] = new JsonObject { ["type"] = "array", ["minItems"] = 1, ["maxItems"] = 32, ["items"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray(definitions.Select(d => (JsonNode?)JsonValue.Create(d["name"]!.GetValue<string>())).ToArray()) } }
+                },
+                ["oneOf"] = new JsonArray(new JsonObject { ["required"] = new JsonArray("action") }, new JsonObject { ["required"] = new JsonArray("actions") }), ["additionalProperties"] = false
+            }
+        });
         return new { tools };
     }
 
@@ -349,8 +373,8 @@ public static class McpBridge
                     if (instances.Count != 1) throw new ArgumentException("请先调用 list_canvases，并指定 process_id。");
                     id = instances[0];
                 }
-                string action = name switch { "canvas_info" => "info", "canvas_select_layer" => "select_layer", "canvas_clear_layer" => "clear_layer", "canvas_resize" => "resize", "canvas_selection_get" => "selection_get", "canvas_selection_set" => "selection_set", "canvas_selection_copy" => "selection_copy", "canvas_selection_paste" => "selection_paste", "canvas_draw_options_get" => "draw_options_get", "canvas_draw_options_set" => "draw_options_set", "canvas_view_get" => "view_get", "canvas_view_set" => "view_set", "canvas_preview" => "preview", "canvas_batch_frames" => "batch_frames", "canvas_add_frame" => "add_frame", "canvas_select_frame" => "select_frame", "canvas_move_frame" => "move_frame", "canvas_set_onion_skin" => "onion_skin", "canvas_delete_frame" => "delete_frame", "canvas_import_frame" => "import_frame", "canvas_set_playback" => "playback", "canvas_read_pixels" => "read", "canvas_pick_composite_color" => "read_composite", "canvas_reference_info" => "reference_info", "canvas_reference_load" => "reference_load", "canvas_reference_settings" => "reference_settings", "canvas_reference_clear" => "reference_clear", "canvas_reference_image" => "reference_image", "canvas_paint_pixels" => "paint", "canvas_replace_color" => "replace_color", "canvas_palette_get" => "palette_get", "canvas_palette_set" => "palette_set", "canvas_palette_load" => "palette_load", "canvas_palette_save" => "palette_save", "canvas_batch_paint" => "batch_paint", "canvas_draw_shape" => "shape", "canvas_fill" => "fill", "canvas_gradient" => "gradient", "canvas_copy_region" => "copy_region", "canvas_move_region" => "move_region", "canvas_add_layer" => "add_layer", "canvas_delete_layer" => "delete_layer", "canvas_move_layer" => "move_layer", "canvas_set_layer_visibility" => "layer_visibility", "canvas_undo" => "undo", "canvas_redo" => "redo", "canvas_save_copy" => "save_copy", "canvas_open_project" => "open_project", "canvas_save_project" => "save_project", "canvas_save_and_export" => "save_export", "canvas_export_presets_list" => "presets_list", "canvas_export_presets_put" => "presets_put", "canvas_export_presets_delete" => "presets_delete", "canvas_export_with_preset" => "export_preset", "canvas_export_png" => "export", "canvas_export_gif" => "export_gif", "canvas_export_sprite_sheet" => "export_sprite_sheet", _ => throw new ArgumentException("未知工具。") };
-                var reply = await CallCanvasAsync(id, action, args, name is "canvas_batch_paint" or "canvas_batch_frames" or "canvas_save_and_export" or "canvas_export_gif" or "canvas_export_sprite_sheet" or "canvas_export_with_preset" ? 30000 : 5000).ConfigureAwait(false);
+                string action = name switch { "canvas_info" => "info", "canvas_select_layer" => "select_layer", "canvas_clear_layer" => "clear_layer", "canvas_resize" => "resize", "canvas_selection_get" => "selection_get", "canvas_selection_set" => "selection_set", "canvas_selection_copy" => "selection_copy", "canvas_selection_paste" => "selection_paste", "canvas_draw_options_get" => "draw_options_get", "canvas_draw_options_set" => "draw_options_set", "canvas_view_get" => "view_get", "canvas_view_set" => "view_set", "canvas_preview" => "preview", "canvas_batch_frames" => "batch_frames", "canvas_add_frame" => "add_frame", "canvas_select_frame" => "select_frame", "canvas_move_frame" => "move_frame", "canvas_set_onion_skin" => "onion_skin", "canvas_delete_frame" => "delete_frame", "canvas_import_frame" => "import_frame", "canvas_set_playback" => "playback", "canvas_read_pixels" => "read", "canvas_pick_composite_color" => "read_composite", "canvas_reference_info" => "reference_info", "canvas_reference_load" => "reference_load", "canvas_reference_settings" => "reference_settings", "canvas_reference_clear" => "reference_clear", "canvas_reference_image" => "reference_image", "canvas_paint_pixels" => "paint", "canvas_replace_color" => "replace_color", "canvas_palette_get" => "palette_get", "canvas_palette_set" => "palette_set", "canvas_palette_load" => "palette_load", "canvas_palette_save" => "palette_save", "canvas_batch_paint" => "batch_paint", "canvas_draw_shape" => "shape", "canvas_fill" => "fill", "canvas_gradient" => "gradient", "canvas_copy_region" => "copy_region", "canvas_move_region" => "move_region", "canvas_add_layer" => "add_layer", "canvas_delete_layer" => "delete_layer", "canvas_move_layer" => "move_layer", "canvas_set_layer_visibility" => "layer_visibility", "canvas_undo" => "undo", "canvas_redo" => "redo", "canvas_save_copy" => "save_copy", "canvas_open_project" => "open_project", "canvas_save_project" => "save_project", "canvas_save_and_export" => "save_export", "canvas_export_presets_list" => "presets_list", "canvas_export_presets_put" => "presets_put", "canvas_export_presets_delete" => "presets_delete", "canvas_export_with_preset" => "export_preset", "canvas_export_png" => "export", "canvas_export_gif" => "export_gif", "canvas_export_sprite_sheet" => "export_sprite_sheet", "canvas_export_svg" => "export_svg", "canvas_export_frame_sequence" => "export_frames", _ => throw new ArgumentException("未知工具。") };
+                var reply = await CallCanvasAsync(id, action, args, name is "canvas_batch_paint" or "canvas_batch_frames" or "canvas_save_and_export" or "canvas_export_gif" or "canvas_export_sprite_sheet" or "canvas_export_frame_sequence" or "canvas_export_with_preset" ? 30000 : 5000).ConfigureAwait(false);
                 if (reply["ok"]?.GetValue<bool>() != true) throw new InvalidOperationException(reply["error"]?.GetValue<string>() ?? "画布操作失败。");
                 data = reply["data"]?.DeepClone() ?? new JsonObject();
                 if (name is "canvas_reference_image" or "canvas_preview" && data is JsonObject reference)

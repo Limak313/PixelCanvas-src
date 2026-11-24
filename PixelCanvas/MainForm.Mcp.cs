@@ -139,6 +139,8 @@ public sealed partial class MainForm
             "export" => ExportFromMcp(args),
             "export_gif" => ExportGifFromMcp(args),
             "export_sprite_sheet" => ExportSpriteSheetFromMcp(args),
+            "export_svg" => ExportSvgFromMcp(args),
+            "export_frames" => ExportFrameSequenceFromMcp(args),
             "presets_list" => new { ok = true, data = ExportPresets.List().Select(PresetData).ToArray() },
             "presets_put" => PutPresetFromMcp(args),
             "presets_delete" => DeletePresetFromMcp(args),
@@ -452,8 +454,25 @@ public sealed partial class MainForm
         return new { ok = true, data = new { path, layout = layout.ToData(), order = "row-major" } };
     }
 
-    private static object PresetData(ExportPreset p) => new { name = p.Name, format = p.Format, scale = p.Scale, fps = p.Fps, columns = p.Columns, directory = p.Directory };
+    private object ExportSvgFromMcp(JsonObject args)
+    {
+        string path = McpCanvas.NewPath(args, "path", ".svg");
+        int rectangles = McpCanvas.ExportSvg(path, _layers);
+        return new { ok = true, data = new { path, format = "svg", frame = _activeFrame, rectangles, vector = true } };
+    }
 
+    private object ExportFrameSequenceFromMcp(JsonObject args)
+    {
+        string directory = McpCanvas.Text(args, "directory");
+        if (!Path.IsPathFullyQualified(directory)) throw new ArgumentException("directory 必须是绝对路径。");
+        if (Directory.Exists(directory)) throw new IOException("输出目录已存在，请换一个新的绝对路径。");
+        string baseName = args["base_name"] is null ? "frame" : McpCanvas.Text(args, "base_name");
+        SyncCurrentFrame();
+        var result = FrameSequenceExport.Save(directory, baseName, _frames, McpCanvas.Number(args, "scale", 1));
+        return new { ok = true, data = result.ToData() };
+    }
+
+    private static object PresetData(ExportPreset p) => new { name = p.Name, format = p.Format, scale = p.Scale, fps = p.Fps, columns = p.Columns, directory = p.Directory };
     private object PutPresetFromMcp(JsonObject args)
     {
         string directory = args["directory"] is null ? "" : args["directory"]!.GetValue<string>();

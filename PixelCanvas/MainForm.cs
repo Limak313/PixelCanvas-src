@@ -156,10 +156,16 @@ public sealed partial class MainForm : Form
     private Control BuildStatusBar()
     {
         var bar = new Panel { Dock = DockStyle.Bottom, Height = 30, BackColor = Color.FromArgb(30, 34, 43), Padding = new Padding(12, 0, 12, 0) };
-        _statusHint = new Label { Dock = DockStyle.Right, Width = 270, Text = "滚轮缩放  /  中键平移",
-            TextAlign = ContentAlignment.MiddleRight, ForeColor = Color.FromArgb(150, 165, 184) };
-        _statusText = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
-            ForeColor = Color.FromArgb(205, 218, 234), AutoEllipsis = true };
+        _statusHint = new Label
+        {
+            Dock = DockStyle.Right, Width = 270, Text = "滚轮缩放  /  中键平移",
+            TextAlign = ContentAlignment.MiddleRight, ForeColor = Color.FromArgb(150, 165, 184)
+        };
+        _statusText = new Label
+        {
+            Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
+            ForeColor = Color.FromArgb(205, 218, 234), AutoEllipsis = true
+        };
         bar.Controls.Add(_statusText);
         bar.Controls.Add(_statusHint);
         return bar;
@@ -170,9 +176,16 @@ public sealed partial class MainForm : Form
         if (_statusText is null || _canvas is null || _layers.Count == 0) return;
         string tool = _canvas.Tool switch
         {
-            ToolKind.Pencil => "画笔", ToolKind.Eraser => "橡皮", ToolKind.Eyedropper => "取色",
-            ToolKind.Fill => "填充", ToolKind.Line => "直线", ToolKind.Rectangle => "矩形",
-            ToolKind.Ellipse => "椭圆", ToolKind.Selection => "选区", ToolKind.Gradient => "渐变", _ => "工具"
+            ToolKind.Pencil => "画笔",
+            ToolKind.Eraser => "橡皮",
+            ToolKind.Eyedropper => "取色",
+            ToolKind.Fill => "填充",
+            ToolKind.Line => "直线",
+            ToolKind.Rectangle => "矩形",
+            ToolKind.Ellipse => "椭圆",
+            ToolKind.Selection => "选区",
+            ToolKind.Gradient => "渐变",
+            _ => "工具"
         };
         _statusText.Text = $"■  {tool}     ·     {_grid.Width} × {_grid.Height} PX     ·     {_canvas.Zoom}×     ·     {_layers[_activeLayer].Name}";
     }
@@ -211,9 +224,12 @@ public sealed partial class MainForm : Form
             Padding = new Padding(10, 7, 8, 5), WrapContents = false,
             FlowDirection = FlowDirection.LeftToRight,
         };
-        var brand = new Label { Text = "▦  PIXEL", AutoSize = false, Width = 115, Height = 32,
+        var brand = new Label
+        {
+            Text = "▦  PIXEL", AutoSize = false, Width = 115, Height = 32,
             TextAlign = ContentAlignment.MiddleLeft, ForeColor = Color.FromArgb(129, 201, 239),
-            Font = new Font(Font, FontStyle.Bold), Margin = new Padding(0, 0, 12, 0) };
+            Font = new Font(Font, FontStyle.Bold), Margin = new Padding(0, 0, 12, 0)
+        };
         bar.Controls.Add(brand);
         Button AddCommand(string text, string tip, Action action, int width = 72)
         {
@@ -230,14 +246,20 @@ public sealed partial class MainForm : Form
         _undoButton = AddCommand("撤销", "撤销当前图层（Ctrl+Z）", DoUndo);
         _redoButton = AddCommand("重做", "重做当前图层（Ctrl+Y）", DoRedo);
         AddCommand("适应", "将画布适应窗口", FitCanvas);
-        AddCommand("导出", "导出 PNG 或 GIF 动画", ExportPng);
+        AddCommand("导出", "导出 PNG、GIF 或 SVG", ExportPng);
         AddCommand("沉浸", "沉浸模式（F11）；快捷键帮助（F1）", ToggleImmersive);
-        var placementLabel = new Label { Text = "画布位置", AutoSize = false, Width = 90, Height = 32,
+        var placementLabel = new Label
+        {
+            Text = "画布位置", AutoSize = false, Width = 90, Height = 32,
             TextAlign = ContentAlignment.MiddleRight, ForeColor = Color.FromArgb(205, 215, 228),
-            Margin = new Padding(8, 0, 4, 0) };
-        var placement = _placementCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 92,
+            Margin = new Padding(8, 0, 4, 0)
+        };
+        var placement = _placementCombo = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDownList, Width = 92,
             BackColor = Color.FromArgb(49, 55, 66), ForeColor = Color.FromArgb(235, 239, 245),
-            Margin = new Padding(0, 4, 0, 0), AccessibleName = "画布位置" };
+            Margin = new Padding(0, 4, 0, 0), AccessibleName = "画布位置"
+        };
         placement.Items.AddRange(new object[] { "左上", "居中" });
         placement.SelectedIndex = 0;
         placement.SelectedIndexChanged += (_, _) =>
@@ -1183,7 +1205,9 @@ public sealed partial class MainForm : Form
         bool animation = _frames.Count > 1;
         using var dlg = new SaveFileDialog
         {
-            Filter = animation ? "GIF 动画 (*.gif)|*.gif|PNG 图片 (*.png)|*.png" : "PNG 图片 (*.png)|*.png|GIF 动画 (*.gif)|*.gif",
+            Filter = animation
+                ? "GIF 动画 (*.gif)|*.gif|PNG 图片 (*.png)|*.png|SVG 矢量 (*.svg)|*.svg"
+                : "PNG 图片 (*.png)|*.png|SVG 矢量 (*.svg)|*.svg|GIF 动画 (*.gif)|*.gif",
             InitialDirectory = OutputPaths.DirectoryPath(animation ? ".gif" : ".png", animation),
             FileName = $"pixel-art-{_grid.Width}x{_grid.Height}" + (animation ? ".gif" : ".png"),
         };
@@ -1191,6 +1215,13 @@ public sealed partial class MainForm : Form
 
         try
         {
+            if (string.Equals(Path.GetExtension(dlg.FileName), ".svg", StringComparison.OrdinalIgnoreCase))
+            {
+                // SVG 是矢量的，不需要放大倍数；导出当前帧的可见图层
+                SyncCurrentFrame();
+                SvgExport.Save(dlg.FileName, FrameComposite.Flatten(_layers, _grid.Width, _grid.Height), _grid.Width, _grid.Height, overwrite: true);
+                return;
+            }
             if (string.Equals(Path.GetExtension(dlg.FileName), ".gif", StringComparison.OrdinalIgnoreCase))
             {
                 SyncCurrentFrame();
@@ -1270,7 +1301,7 @@ public sealed partial class MainForm : Form
         if (e.Control && !e.Shift && !e.Alt && e.KeyCode == Keys.E)
         { ExportPng(); e.Handled = true; e.SuppressKeyPress = true; return; }
 
-        OtherShortcuts:
+    OtherShortcuts:
 
         if (e.KeyCode == Keys.Space && !e.Control && !e.Alt)
         {
@@ -1305,7 +1336,8 @@ public sealed partial class MainForm : Form
             case Keys.H: _mirrorHCheck.Checked = !_mirrorHCheck.Checked; break;
             case Keys.V: _mirrorVCheck.Checked = !_mirrorVCheck.Checked; break;
             case Keys.T: _gridCheck.Checked = !_gridCheck.Checked; break;
-            case Keys.Oemcomma: case Keys.OemPeriod:
+            case Keys.Oemcomma:
+            case Keys.OemPeriod:
                 int colorIndex = _palette.FindIndex(p => string.Equals(p, Argb.ToRgbHex(_currentColor), StringComparison.OrdinalIgnoreCase));
                 int direction = e.KeyCode == Keys.OemPeriod ? 1 : -1;
                 int next = colorIndex < 0 ? 0 : (colorIndex + direction + _palette.Count) % _palette.Count;
@@ -1366,10 +1398,16 @@ public sealed partial class MainForm : Form
             MaximizeBox = false, MinimizeBox = false,
         };
         var header = new Panel { Dock = DockStyle.Top, Height = 92, Padding = new Padding(24, 10, 24, 0) };
-        var title = new Label { Text = "快捷键指南", Dock = DockStyle.Top, Height = 40,
-            Font = new Font(dialog.Font.FontFamily, 14F, FontStyle.Bold), ForeColor = Color.FromArgb(136, 207, 245) };
-        var subtitle = new Label { Text = "绘图时按 F1 随时打开  ·  F2 查看当前状态", Dock = DockStyle.Top, Height = 30,
-            ForeColor = Color.FromArgb(171, 185, 202) };
+        var title = new Label
+        {
+            Text = "快捷键指南", Dock = DockStyle.Top, Height = 40,
+            Font = new Font(dialog.Font.FontFamily, 14F, FontStyle.Bold), ForeColor = Color.FromArgb(136, 207, 245)
+        };
+        var subtitle = new Label
+        {
+            Text = "绘图时按 F1 随时打开  ·  F2 查看当前状态", Dock = DockStyle.Top, Height = 30,
+            ForeColor = Color.FromArgb(171, 185, 202)
+        };
         header.Controls.Add(subtitle);
         header.Controls.Add(title);
 
@@ -1385,8 +1423,11 @@ public sealed partial class MainForm : Form
         columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         FlowLayoutPanel MakeColumn()
         {
-            return new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, FlowDirection = FlowDirection.TopDown,
-                WrapContents = false, Padding = new Padding(4, 0, 8, 8) };
+            return new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill, AutoScroll = true, FlowDirection = FlowDirection.TopDown,
+                WrapContents = false, Padding = new Padding(4, 0, 8, 8)
+            };
         }
         var left = MakeColumn();
         var right = MakeColumn();
@@ -1395,15 +1436,24 @@ public sealed partial class MainForm : Form
 
         void AddSection(FlowLayoutPanel column, string heading, params (string Keys, string Action)[] shortcuts)
         {
-            var group = new GroupBox { Text = heading, Width = 420, Height = 30 + shortcuts.Length * 34,
-                Margin = new Padding(0, 0, 0, 12), ForeColor = Color.FromArgb(139, 205, 239) };
+            var group = new GroupBox
+            {
+                Text = heading, Width = 420, Height = 30 + shortcuts.Length * 34,
+                Margin = new Padding(0, 0, 0, 12), ForeColor = Color.FromArgb(139, 205, 239)
+            };
             for (int i = 0; i < shortcuts.Length; i++)
             {
                 int y = 24 + i * 34;
-                var keys = new Label { Text = shortcuts[i].Keys, Left = 12, Top = y, Width = 205, Height = 30,
-                    TextAlign = ContentAlignment.MiddleLeft, ForeColor = Color.FromArgb(229, 235, 245) };
-                var action = new Label { Text = shortcuts[i].Action, Left = 218, Top = y, Width = 190, Height = 30,
-                    TextAlign = ContentAlignment.MiddleLeft, ForeColor = Color.FromArgb(181, 193, 210) };
+                var keys = new Label
+                {
+                    Text = shortcuts[i].Keys, Left = 12, Top = y, Width = 205, Height = 30,
+                    TextAlign = ContentAlignment.MiddleLeft, ForeColor = Color.FromArgb(229, 235, 245)
+                };
+                var action = new Label
+                {
+                    Text = shortcuts[i].Action, Left = 218, Top = y, Width = 190, Height = 30,
+                    TextAlign = ContentAlignment.MiddleLeft, ForeColor = Color.FromArgb(181, 193, 210)
+                };
                 group.Controls.Add(keys);
                 group.Controls.Add(action);
             }

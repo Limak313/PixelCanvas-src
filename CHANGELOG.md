@@ -8,6 +8,8 @@
 - 图层结构可撤销：新增、删除、调整顺序、切换显隐各记一步结构快照，与帧结构共用同一条动作链和同一 64 MiB 预算；`canvas_undo` / `canvas_redo` 不传 `layer` 时自动选择最新的像素或结构改动。
 - MIT 许可证（`LICENSE`），README 增加许可章节。
 - 撤销历史随恢复副本落盘：自动保存时把各图层的像素撤销 / 重做栈写入同目录 `.undo` 文件（gzip + 行 RLE，每层最多 20 步），异常退出后恢复作品时连同 Ctrl+Z 历史一并接回；文件损坏或与工程不符（尺寸、帧数、图层数）时整份丢弃，不影响作品载入。
+- 导出 SVG 矢量色块（`canvas_export_svg`，界面导出对话框同步支持 `.svg`）：当前帧可见图层按行 RLE 后再纵向合并同一列区间，写出 `crispEdges` 的 `<rect>` 列表，透明像素留空；矢量缩放不失真，适合排版与印刷。
+- 导出 PNG 序列帧（`canvas_export_frame_sequence`，动画栏「序列帧」按钮）：全部帧逐张写成 `base-001.png`…到指定新目录，可选前缀与 1–16 倍缩放；目录已有文件时拒绝，不覆盖任何既有产物。
 
 ### 修复
 - 导出与保存统一改为原子写入（`AtomicFile`：同目录临时文件 + 刷盘 + 整文件替换）：工程、GIF、精灵表、PNG、`.pxpal` 与导出预设都先写临时文件再替换。顺带修掉旧实现的隐藏问题——`FileMode.CreateNew` 失败后 `catch` 里会 `File.Delete(path)`，把用户已存在的导出文件删掉；现在目标文件保持原样。
@@ -21,10 +23,12 @@
 - `PixelCanvas.csproj` 显式声明 `<SelfContained>false</SelfContained>`，避免 MCP 服务以框架依赖单文件发布时引用可执行项目触发 NETSDK1151。
 - `pixelcanvas-batch-check.ps1` 与 `Agent部署包\生成客户端配置.ps1` 同时支持两种包形态（按 `server` 内容判断走 `runtime\dotnet.exe` + dll，还是直接跑单文件 exe）。
 - README 增加「界面预览」：主界面、18× 网格细节两张截图与一段 5 帧眨眼动画 GIF（`docs/images/`，由插件 MCP 实际绘制并截图导出）。
+- CI 门禁加严：`dotnet format whitespace --verify-no-changes` 守住代码格式，构建带 `-warnaserror`；工作流限定 `contents: read` 权限、同分支并发自动取消、NuGet 缓存与 20 分钟超时。
+- 新增 `.github/dependabot.yml`：NuGet 与 GitHub Actions 每周各聚合成一个 PR（minor/patch），减少逐包刷屏。
 - `canvas_delete_layer` 与界面删除图层不再清空被删图层的历史，撤销后该层像素与其撤销记录一并恢复。
 
 ### 测试
-- 门禁 74 → 102：新增 `AtomicFileTests` 7 条（原子写入、失败保护、覆盖语义）、`LayerUndoTests` 5 条（删/加/排序/显隐撤销、结构改动清空像素重做）、`AnimationClockTests` 9 条（帧号推进、长时间无漂移、起始帧偏移、轮询间隔边界）、`UndoJournalTests` 7 条（栈序还原、重做栈、尺寸/帧数/图层数不符拒绝、损坏或缺文件拒绝、步数截断、恢复后序号连续）。
+- 门禁 74 → 112：新增 `AtomicFileTests` 7 条（原子写入、失败保护、覆盖语义）、`LayerUndoTests` 5 条（删/加/排序/显隐撤销、结构改动清空像素重做）、`AnimationClockTests` 9 条（帧号推进、长时间无漂移、起始帧偏移、轮询间隔边界）、`UndoJournalTests` 7 条（栈序还原、重做栈、尺寸/帧数/图层数不符拒绝、损坏或缺文件拒绝、步数截断、恢复后序号连续）、`ExportFormatsTests` 5 条（SVG 合并矩形与透明、像素数校验、可见图层合成、序列帧命名与缩放、非空目录与非法参数拒绝）、`McpExportFormatTests` 2 条（`export_svg` / `export_frames` 穿过分组层路由），另在 `McpRoutingTests` 补 3 条分组不变量（每个操作只属于一个入口、`tool_info` 枚举为并集、新增导出操作在分组调用下可分发）。
 
 ## [1.0.36] - 2026-11-24
 

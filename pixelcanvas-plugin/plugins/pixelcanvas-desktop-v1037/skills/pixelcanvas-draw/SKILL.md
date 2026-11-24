@@ -29,6 +29,8 @@ description: 在 PixelCanvas Desktop 中通过本地 MCP 直接创建、读取�
 
 用户同时要求保存工程和导出图片时使用 `canvas_save_and_export`，未指定路径时使用默认产出文件夹；只导出当前帧。检查 `projectSaved` 和 `pngExported`：导出失败时工程可能已保存，应说明实际结果，不要重复保存或声称导出成功。
 
+用户要求矢量图（印刷、排版、任意缩放）时用 `canvas_export_svg`：只导出当前帧可见图层，相邻同色像素合并为矩形，透明留空，没有 `scale` 参数；目标 `.svg` 不能已存在，得到 `rectangles` 后可告知色块数量。
+
 用户要求使用导出预设时，通过 `canvas_export_presets_list` 查看，再用 `canvas_export_with_preset` 按名称导出；预设支持 PNG 当前帧、GIF、精灵表，GIF 预设帧率不改变工程帧率。用户要求创建预设时用 `canvas_export_presets_put`；覆盖同名预设须用户明确要求并传 `overwrite=true`。仅在用户明确要求删除时使用 `canvas_export_presets_delete` 并传 `confirm=true`。输出始终是新文件，报告返回的实际路径。
 
 如果画布状态为 `recovery_pending`，请用户先在画布窗口处理自动恢复提示，不要再次启动画布或修改文件。如果保存提示工程已被外部修改，请保留当前画布，告知冲突并在用户指定新路径后另存副本，不要覆盖外部修改。

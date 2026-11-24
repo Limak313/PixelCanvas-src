@@ -7,7 +7,7 @@
 - 画布：默认 32×32；预设 8/16/32/64/128/256/512；支持自定义 4–512（可非正方形），透明格显示棋盘格。
 - 工具：画笔（B）、橡皮（E）、取色器（I）、油漆桶（G）、渐变（D），以及直线、矩形、椭圆和选区；画笔大小 1–4，右键可快速取色。
 - 渐变：当前颜色为起始色，可设置结束色并交换两色；在连续同色区域内拖动确定方向和范围，支持镜像与撤销。
-- 本地 MCP：支持连接正在运行的画布或操作工程文件，配置和工具说明见 [MCP.md](MCP.md)。
+- 本地 MCP：支持连接正在运行的画布或操作工程文件，配置和工具说明见 [MCP.md](MCP.md)；对外只暴露 8 个分组工具（`canvas` / `layers` / `settings` / `animation` / `draw` / `files` / `project` / `tool_info`），78 个操作按组收敛在各自的 `action` 枚举里，旧名称仍可直接调用。
 - 调色板：内置 32 色 DawnBringer（DB32）+ 自定义颜色（系统原生取色器）。
 - 对称绘制：水平镜像 / 垂直镜像独立开关，可同时开启（一点对称 4 点）。
 - 图层：最多 32 层，支持新建、删除、调整顺序和显示 / 隐藏；隐藏的图层不能绘制。
@@ -23,6 +23,8 @@
 - 参考图：打开本地图片作为画布底图，可调整不透明度和显示状态；参考图不会保存在工程中或出现在导出的 PNG 中。
 - 沉浸画图：F11 进入或退出全屏画布，Esc 退出；F1 查看全部快捷键，F2 查看当前画布和工具状态。
 - 导出 PNG：1×–16× 最近邻放大，无网格线、透明背景保留。
+- 导出 SVG：把当前帧的可见图层写成矢量色块，相邻同色像素合并为矩形，透明留空；任意缩放不失真，便于排版或继续在矢量软件里编辑。
+- 导出序列帧：动画栏“序列帧”把全部帧逐张写成 PNG（`frame-001.png`…）到动画目录下的新文件夹，默认沿用当前导出倍数，不覆盖已有文件。
 - 导出 GIF：多帧画布的导出对话框默认选择循环 GIF，保存到动画文件夹；支持透明背景和 1×–16× 最近邻放大。GIF 最多使用 255 种不透明颜色，超过时会量化。普通工程保存仍为可编辑的 `.pxproj`。
 - 其他：网格线开关、悬停笔刷高亮、整数倍自动缩放（高 DPI 支持）。
 
@@ -69,7 +71,7 @@ dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Cate
 dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Category=UI"
 ```
 
-测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、原子写入、撤销历史落盘、绘画算法、调色板为无头可运行的核心用例；`UiSmokeTests` 的 9 条界面路径用例按环境依赖分两组：7 条只要求能创建窗体句柄，标 `Category=UiHost`，随默认门禁进入 CI；2 条依赖播放定时器消息泵与时间轴坐标映射（`FrameHistory_SwitchFrameUndoAndPlayback`、`AnimationFrames_OnionSkin_ReorderAndTimelineDrag`），标 `Category=UI`，在本机用 `-Ui` 执行。`FrameUndoTests`、`LayerUndoTests` 与 `UiHostProbeTests` 同属 `Category=UiHost`，分别覆盖帧与图层的结构撤销、以及运行环境能否承载界面用例；`UndoJournalTests` 为无头用例，覆盖撤销历史落盘的栈序还原、拒绝不匹配文件与步数截断。当前门禁 102 条，本机 UI 组 2 条。
+测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、原子写入、撤销历史落盘、绘画算法、调色板为无头可运行的核心用例；`UiSmokeTests` 的 9 条界面路径用例按环境依赖分两组：7 条只要求能创建窗体句柄，标 `Category=UiHost`，随默认门禁进入 CI；2 条依赖播放定时器消息泵与时间轴坐标映射（`FrameHistory_SwitchFrameUndoAndPlayback`、`AnimationFrames_OnionSkin_ReorderAndTimelineDrag`），标 `Category=UI`，在本机用 `-Ui` 执行。`FrameUndoTests`、`LayerUndoTests` 与 `UiHostProbeTests` 同属 `Category=UiHost`，分别覆盖帧与图层的结构撤销、以及运行环境能否承载界面用例；`UndoJournalTests` 为无头用例，覆盖撤销历史落盘的栈序还原、拒绝不匹配文件与步数截断；`ExportFormatsTests` 与 `McpExportFormatTests` 覆盖 SVG 色块合并、序列帧命名与缩放、非空目录拒绝，以及新增导出动作的 MCP 路由；`McpRoutingTests` 锁住「每个操作只属于一个分组入口、`tool_info` 枚举为并集」。当前门禁 112 条，本机 UI 组 2 条。
 
 ## 发布打包
 

@@ -17,6 +17,8 @@ description: 在 PixelCanvas Desktop 中通过本地 MCP 创建、编辑、导�
 
 用户要求精灵表时，使用 `canvas_export_sprite_sheet`，或对磁盘工程使用 `project_export_sprite_sheet`；可选 `columns`（每行帧数）和 `scale`（1–16），省略路径时生成在 PNG 文件夹。全部帧按从左到右、从上到下排列，透明格保留；返回的 `layout` 含行列数、缩放后的帧尺寸和整图尺寸，告知用户这些信息。输出不含网格、洋葱皮或参考图。导出最大边长 16384、总像素 16777216，超限时减少列数或放大倍数。
 
+用户要求逐帧素材（游戏引擎逐帧动画、剪辑软件序列帧）时用 `canvas_export_frame_sequence`：`directory` 必须是尚不存在的绝对路径，可选 `base_name`（默认 `frame`）与 `scale`（1–16），一次写出全部帧 PNG；目录已有文件会被拒绝，不要试图覆盖。返回 `frameCount`、`width`、`height`、`scale` 与 `files`，向用户报告实际目录和帧数。
+
 用户要求用导出预设时先调用 `canvas_export_presets_list`，再用 `canvas_export_with_preset`；GIF 预设帧率只影响输出，不修改工程帧率。预设的创建、替换和删除遵循用户的明确要求，覆盖或删除分别须传 `overwrite=true` 或 `confirm=true`。
 
 仅在用户明确要求删除当前指定帧时调用 `canvas_delete_frame` 并传入 `confirm=true`；确认后仍可用 `canvas_undo` 撤销，且至少保留一帧。至多 128 帧，受总图层像素上限约束，超限时说明而不是删除已有内容。用户要求保存或导出动画时，先停止播放，默认使用 `canvas_export_gif` 导出循环 GIF（磁盘工程可使用 `project_export_gif`），未指定路径时保存在动画文件夹并报告实际路径。GIF 颜色超过 255 种时会量化，无法保存图层；用户要求可继续编辑的工程时另用 `canvas_save_project` 或 `canvas_save_copy` 保存 `.pxproj`。PNG 仅包含当前帧。报告实际帧数、帧率和保存情况。

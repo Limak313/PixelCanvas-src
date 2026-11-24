@@ -10,7 +10,7 @@ Codex 桌面插件使用其自身的插件管理方式；独立部署包与 Code
 
 ## 工具入口
 
-新版 MCP 服务将操作分为七个入口：`pixelcanvas_canvas`（窗口与画布）、`pixelcanvas_draw`（绘画与读取）、`pixelcanvas_layers`（图层与选区）、`pixelcanvas_animation`（动画）、`pixelcanvas_settings`（视图、参考图与调色板）、`pixelcanvas_files`（保存与导出）和 `pixelcanvas_project`（工程文件）。第八个工具 `pixelcanvas_tool_info` 用于查询操作的完整参数 schema。
+新版 MCP 服务将 78 个操作分为七个入口：`pixelcanvas_canvas`（窗口与画布）、`pixelcanvas_draw`（绘画与读取）、`pixelcanvas_layers`（图层与选区）、`pixelcanvas_animation`（动画）、`pixelcanvas_settings`（视图、参考图与调色板）、`pixelcanvas_files`（保存与导出）和 `pixelcanvas_project`（工程文件）。第八个工具 `pixelcanvas_tool_info` 用于查询操作的完整参数 schema。每个操作只会出现在一个入口的 `action` 枚举里，`pixelcanvas_tool_info` 的枚举是它们的并集。
 
 先从分组工具的描述中选择操作名，再用 `pixelcanvas_tool_info` 的 `action` 查询参数。调用分组工具时将原操作名放在 `action`，原参数对象放在 `arguments`，例如 `pixelcanvas_project` 的参数为 `{"action":"project_info","arguments":{"path":"C:\\art\\example.pxproj"}}`。下文列出的原名称均是操作名。为兼容已有客户端，服务仍接受直接使用原名称的调用，但不会在 `tools/list` 中列出这些旧名称。客户端通常需要重启或刷新 MCP 工具列表才能看到新入口；已安装的旧版本插件或部署包不会自动更新。
 
@@ -35,6 +35,7 @@ Codex 桌面插件使用其自身的插件管理方式；独立部署包与 Code
 - `canvas_add_layer`、`canvas_undo`、`canvas_redo`：新建图层和撤销 / 重做。
 - `canvas_delete_layer`、`canvas_move_layer`、`canvas_set_layer_visibility`：删除、排序和设置图层显隐，三者都可用 `canvas_undo` 撤销。索引从底层 0 开始；删除须明确提供 `confirm: true`，且至少保留一层。
 - `canvas_save_copy`、`canvas_export_png`：另存为新的工程或 PNG 文件，不更改当前工程路径。
+- `canvas_export_svg`、`canvas_export_frame_sequence`：导出当前帧的 SVG 矢量色块，或把全部帧写成 PNG 序列目录；都不覆盖既有文件。
 - `canvas_open_project`：将绝对路径的工程打开到窗口；有未保存修改时拒绝操作。
 - `canvas_save_project`：保存当前工程；未命名画布省略路径时使用默认目录，已有路径的工程会保存回原文件。另存副本使用 `canvas_save_copy`。
 
@@ -42,13 +43,17 @@ Codex 桌面插件使用其自身的插件管理方式；独立部署包与 Code
 
 多帧工程中，画布工具操作当前帧；`canvas_info` 返回帧数、当前帧索引、帧率和播放状态。`canvas_add_frame`、`canvas_select_frame`、`canvas_delete_frame`、`canvas_import_frame` 和 `canvas_set_playback` 可管理当前窗口的动画帧；帧索引从 0 开始，删除需明确确认，确认后仍可用 `canvas_undo` 撤销。播放期间修改画布的 MCP 请求会被拒绝，停止播放后可继续编辑。工程文件工具修改当前帧并另存时会保留其他帧。
 
-`canvas_export_gif` 和 `project_export_gif` 将全部帧导出为循环 GIF，未指定路径时保存到 `input\动画`。可指定 1–16 倍缩放，总输出像素（宽 × 高 × 帧数）不超过 16,777,216。GIF 保留透明像素和可见图层合成，但不保留独立图层；超过 255 种不透明颜色时量化。帧延时按 GIF 的百分之一秒精度近似帧率。要继续编辑请另存 `.pxproj`。
+`canvas_export_gif` 和 `project_export_gif` 将全部帧导出为循环 GIF，未指定路径时保存到 `output\动画`。可指定 1–16 倍缩放，总输出像素（宽 × 高 × 帧数）不超过 16,777,216。GIF 保留透明像素和可见图层合成，但不保留独立图层；超过 255 种不透明颜色时量化。帧延时按 GIF 的百分之一秒精度近似帧率。要继续编辑请另存 `.pxproj`。
 
 `canvas_preview` 以 MCP 图片返回当前帧的可见图层合成 PNG，不含网格与参考图；`max_side` 为 1–512，默认 512。`canvas_batch_frames` 向末尾一次追加 1–32 帧；每项 `copy=true` 复制上一项（第一项复制当前帧），否则新建空白帧，每项可提供与 `canvas_batch_paint` 相同的 `operations`；可选 `fps`。整批成功后切换到最后一帧，失败不修改动画或帧率。整批最多 256 个操作、16384 个显式像素，每帧最多 64 操作；整批作为一步撤销。
 
 `canvas_move_frame` 使用从 0 开始的 `frame` 和 `target_index` 调整帧顺序，当前选中的帧保持选中，排序可用 `canvas_undo` 撤销；播放中需先停止。`canvas_undo` / `canvas_redo` 不传 `layer` 时按动作先后自动选择图层像素或结构改动（帧与图层），传 `layer` 时只作用于该图层。`canvas_set_onion_skin` 的 `enabled` 控制洋葱皮；`canvas_info` 中 `onionEnabled` 表示开关，`onionVisible` 表示当前是否显示，播放中会暂时隐藏。洋葱皮不进入合成预览、PNG 或 GIF。
 
 `canvas_export_sprite_sheet` 和 `project_export_sprite_sheet` 将全部帧从左到右、从上到下排列成 PNG；可选 `columns`（1–64，默认帧数平方根向上取整）和 `scale`（1–16）。结果的 `layout` 包含行列数、每帧尺寸和整图尺寸，空余单元格透明；不包含隐藏图层、网格、参考图和洋葱皮。单边最多 16384 像素、总计最多 16777216 像素。未指定输出路径时使用动画文件夹，不覆盖已有文件。
+
+`canvas_export_svg` 把当前帧的可见图层写成 SVG：相邻同色像素先横向合并、再纵向合并为 `<rect>`，透明像素不输出，`shape-rendering="crispEdges"` 保证缩放后边缘清晰。结果不随缩放失真，因此没有 `scale` 参数；返回 `rectangles` 为色块数。`path` 必须是尚不存在的 `.svg` 绝对路径，省略时写入默认 PNG 目录。
+
+`canvas_export_frame_sequence` 把全部帧按顺序写成 PNG 序列到 `directory`（必须是新目录或空目录，已有文件不覆盖），文件名默认 `frame-001.png`、`frame-002.png`…，可用 `base_name` 改前缀、`scale` 指定 1–16 倍。返回 `directory`、`frameCount`、`width`、`height`、`scale` 与 `files` 列表；适合游戏引擎逐帧导入。该动作只作用于运行中的画布，磁盘工程请先 `canvas_open_project` 或按需用 `project_export_png` 逐帧处理。
 
 `canvas_replace_color` 在当前帧指定图层替换所有匹配的 `from_color`，支持目标 `to_color` 为 `#RRGGBB` 或 `transparent`，作为一步撤销。`canvas_palette_get` / `canvas_palette_set` 读取或替换工程调色板，`canvas_palette_save` / `canvas_palette_load` 保存和加载 `.pxpal`；更改调色板不改变画布像素，也不进入画布撤销历史。文件最多 128 KiB、最多 1024 色，输出不覆盖已有文件。
 
