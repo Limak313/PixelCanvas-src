@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PixelCanvas;
@@ -16,7 +17,7 @@ internal static class UiTestSupport
 {
     public const BindingFlags InstanceNonPublic = BindingFlags.Instance | BindingFlags.NonPublic;
 
-    /// <summary>在独立 STA 线程执行动作，Join 后把线程内异常抛回测试线程。</summary>
+    /// <summary>在独立 STA 线程执行动作，Join 后把线程内异常（保留原始堆栈）抛回测试线程。</summary>
     public static void RunInSta(Action action)
     {
         Exception? error = null;
@@ -24,7 +25,7 @@ internal static class UiTestSupport
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         thread.Join();
-        if (error is not null) throw error;
+        if (error is not null) ExceptionDispatchInfo.Capture(error).Throw();
     }
 
     public static T Field<T>(object target, string name) =>

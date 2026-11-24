@@ -855,6 +855,7 @@ public sealed partial class MainForm : Form
         _grid = new PixelGrid(w, h);
         _layers = new List<Layer> { new("图层 1", _grid) };
         _frames = new List<AnimationFrame> { new(_layers) }; _activeFrame = 0;
+        _frameUndo.Clear();
         _historyBudget = new HistoryBudget();
         _layers[0].SetHistoryBudget(_historyBudget);
         _activeLayer = 0;
@@ -932,32 +933,66 @@ public sealed partial class MainForm : Form
 
     // ---------- 工具动作 ----------
 
-    private void DoUndo()
+    private void DoUndo() => StepHistory(redo: false);
+
+    private void DoRedo() => StepHistory(redo: true);
+
+    /// <summary>
+    /// 撤销或重做一步：图层像素历史与帧结构快照按动作序号竞争——撤销取序号更大者，重做取更小者。
+    /// 像素历史跨所有帧的所有图层扫描，因此可能落在非当前帧；命中时自动切到该帧图层再撤销。
+    /// </summary>
+    private bool StepHistory(bool redo)
     {
-        if (!_history.CanUndo) return;
-        int[] current = _grid.Snapshot();
-        int[] before = _history.Undo(current);
-        _grid.Restore(before);
-        _canvas.RefreshFromData();
+        if (_playing || _canvas.InteractionInProgress) return false;
+        SyncCurrentFrame();
+        var best = BestPixelHistory(redo);
+        bool frame = redo ? _frameUndo.CanRedo : _frameUndo.CanUndo;
+        if (best is null && !frame) return false;
+        long pixelSeq = best?.Item3 ?? (redo ? long.MaxValue : long.MinValue);
+        bool frameFirst = frame && (best is null ||
+            (redo ? _frameUndo.RedoSeq < pixelSeq : _frameUndo.UndoSeq > pixelSeq));
+        if (frameFirst)
+        {
+            var current = CaptureFrames();
+            RestoreFrameSnapshot(redo ? _frameUndo.Redo(current) : _frameUndo.Undo(current));
+        }
+        else
+        {
+            int frameIndex = best!.Value.Item1, layerIndex = best.Value.Item2;
+            if (frameIndex != _activeFrame) SwitchFrame(frameIndex);
+            if (layerIndex != _activeLayer) { _activeLayer = layerIndex; ActivateLayer(); }
+            var layer = _layers[layerIndex];
+            int[] current = layer.Grid.Snapshot();
+            layer.Grid.Restore(redo ? layer.History.Redo(current) : layer.History.Undo(current));
+            _canvas.RefreshFromData();
+        }
         UpdateUndoButtons();
         SetDirty();
+        return true;
     }
 
-    private void DoRedo()
+    /// <summary>在所有帧的所有图层中找出撤销/重做序号最优的一层（撤销取最大、重做取最小）。</summary>
+    private (int Frame, int Layer, long Seq)? BestPixelHistory(bool redo)
     {
-        if (!_history.CanRedo) return;
-        int[] current = _grid.Snapshot();
-        int[] next = _history.Redo(current);
-        _grid.Restore(next);
-        _canvas.RefreshFromData();
-        UpdateUndoButtons();
-        SetDirty();
+        (int Frame, int Layer, long Seq)? best = null;
+        long sideEdge = redo ? long.MaxValue : long.MinValue;
+        for (int f = 0; f < _frames.Count; f++)
+        {
+            var layers = _frames[f].Layers;
+            for (int l = 0; l < layers.Count; l++)
+            {
+                long seq = redo ? layers[l].History.RedoSeq : layers[l].History.UndoSeq;
+                if (seq == sideEdge) continue;
+                if (best is null || (redo ? seq < best.Value.Seq : seq > best.Value.Seq)) best = (f, l, seq);
+            }
+        }
+        return best;
     }
 
     private void UpdateUndoButtons()
     {
-        _undoButton.Enabled = _history.CanUndo;
-        _redoButton.Enabled = _history.CanRedo;
+        _undoButton.Enabled = _history.CanUndo || _frameUndo.CanUndo;
+        _redoButton.Enabled = _history.CanRedo || _frameUndo.CanRedo;
     }
 
     private void ClearCanvas()
@@ -1118,6 +1153,7 @@ public sealed partial class MainForm : Form
         _layers = result.Layers;
         _historyBudget = new HistoryBudget();
         foreach (var frame in _frames) foreach (var layer in frame.Layers) layer.SetHistoryBudget(_historyBudget);
+        _frameUndo.Clear();
         _activeLayer = result.ActiveLayer;
         _palette = result.Palette;
         _canvas.Layers = _layers;
@@ -1482,6 +1518,7 @@ public sealed partial class MainForm : Form
                     _layers = result.Layers;
                     _historyBudget = new HistoryBudget();
                     foreach (var frame in _frames) foreach (var layer in frame.Layers) layer.SetHistoryBudget(_historyBudget);
+                    _frameUndo.Clear();
                     _activeLayer = result.ActiveLayer;
                     _grid = result.Grid;
                     _palette = result.Palette;

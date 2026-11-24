@@ -38,9 +38,15 @@ public sealed class History
     {
         internal readonly History Owner;
         internal readonly int[] Pixels;
+        internal readonly long Seq;
         internal LinkedListNode<Entry>? Node;
-        internal Entry(History owner, int[] pixels) { Owner = owner; Pixels = pixels; }
+        internal Entry(History owner, int[] pixels, long seq) { Owner = owner; Pixels = pixels; Seq = seq; }
     }
+
+    private static long _seqCounter;
+
+    /// <summary>全局动作序号：图层像素提交与帧结构改动共用同一计数器，用于决定撤销/重做的先后。</summary>
+    public static long NextSeq() => Interlocked.Increment(ref _seqCounter);
 
     private readonly List<Entry> _undo = new();
     private readonly List<Entry> _redo = new();
@@ -51,19 +57,25 @@ public sealed class History
     public bool CanUndo => _undo.Count > 0;
     public bool CanRedo => _redo.Count > 0;
 
-    private void Push(List<Entry> stack, int[] pixels)
+    /// <summary>栈顶待撤销动作的序号；为空时返回 <see cref="long.MinValue"/>。</summary>
+    public long UndoSeq => _undo.Count > 0 ? _undo[^1].Seq : long.MinValue;
+
+    /// <summary>栈顶待重做动作的序号；为空时返回 <see cref="long.MaxValue"/>。</summary>
+    public long RedoSeq => _redo.Count > 0 ? _redo[^1].Seq : long.MaxValue;
+
+    private void Push(List<Entry> stack, int[] pixels, long seq)
     {
-        var entry = new Entry(this, pixels);
+        var entry = new Entry(this, pixels, seq);
         stack.Add(entry);
         _budget.Add(entry);
     }
 
-    private int[] Pop(List<Entry> stack)
+    private Entry Pop(List<Entry> stack)
     {
         var entry = stack[^1];
         stack.RemoveAt(stack.Count - 1);
         _budget.Remove(entry);
-        return entry.Pixels;
+        return entry;
     }
 
     internal void Evict(Entry entry)
@@ -82,25 +94,28 @@ public sealed class History
     public void Commit(int[] beforeSnapshot)
     {
         ClearStack(_redo);
-        Push(_undo, beforeSnapshot);
+        Push(_undo, beforeSnapshot, NextSeq());
         if (_undo.Count > MaxSteps) Evict(_undo[0]);
     }
 
     public int[] Undo(int[] currentSnapshot)
     {
         if (!CanUndo) throw new InvalidOperationException("没有可撤销的历史。");
-        int[] before = Pop(_undo);
-        Push(_redo, currentSnapshot);
-        return before;
+        var entry = Pop(_undo);
+        Push(_redo, currentSnapshot, entry.Seq);   // 重做条目沿用被撤销动作的序号
+        return entry.Pixels;
     }
 
     public int[] Redo(int[] currentSnapshot)
     {
         if (!CanRedo) throw new InvalidOperationException("没有可重做的历史。");
-        int[] next = Pop(_redo);
-        Push(_undo, currentSnapshot);
-        return next;
+        var entry = Pop(_redo);
+        Push(_undo, currentSnapshot, entry.Seq);
+        return entry.Pixels;
     }
+
+    /// <summary>清空重做栈：结构改动等新动作发生后，重做不再可用。</summary>
+    public void ClearRedo() => ClearStack(_redo);
 
     public void Clear() { ClearStack(_undo); ClearStack(_redo); }
 }

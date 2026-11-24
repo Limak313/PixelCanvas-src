@@ -6,6 +6,7 @@ namespace PixelCanvas;
 public sealed partial class MainForm
 {
     private readonly System.Windows.Forms.Timer _animationTimer = new();
+    private readonly FrameUndo _frameUndo = new();
     private FrameTimeline? _timeline;
     private CheckBox? _onionCheck;
     private NumericUpDown _fpsControl = null!;
@@ -25,6 +26,36 @@ public sealed partial class MainForm
         return _frames.Count < ProjectFile.MaxFrames && pixels + (long)layerCount * _grid.Width * _grid.Height <= ProjectFile.MaxAnimationPixels;
     }
 
+    /// <summary>当前结构的快照（先把正在编辑的图层引用同步回当前帧）。</summary>
+    private FrameUndo.Snapshot CaptureFrames()
+    {
+        SyncCurrentFrame();
+        return _frameUndo.Capture(_frames, _activeFrame);
+    }
+
+    /// <summary>记录一次帧结构改动之前的快照；结构改动属于新动作，所有重做同时失效。</summary>
+    private void RecordFrameStructure()
+    {
+        _frameUndo.Commit(CaptureFrames());
+        foreach (var frame in _frames) foreach (var layer in frame.Layers) layer.History.ClearRedo();
+        UpdateUndoButtons();
+    }
+
+    /// <summary>把帧列表与当前帧恢复到快照状态，并重建画布、图层与时间轴绑定。</summary>
+    private void RestoreFrameSnapshot(FrameUndo.Snapshot snapshot)
+    {
+        _frames = snapshot.Frames.ToList();
+        _activeFrame = Math.Clamp(snapshot.ActiveFrame, 0, _frames.Count - 1);
+        _layers = _frames[_activeFrame].Layers;
+        _activeLayer = Math.Clamp(_frames[_activeFrame].ActiveLayer, 0, _layers.Count - 1);
+        _grid = _layers[_activeLayer].Grid;
+        _canvas.Layers = _layers;
+        _canvas.Editable = !_playing && _layers[_activeLayer].Visible;
+        _canvas.SetGrid(_grid);
+        _canvas.RefreshFromData();
+        RefreshLayerList(); UpdateUndoButtons(); UpdateStatus(); RefreshAnimationControls(); SetDirty();
+    }
+
     private Control BuildAnimationBar()
     {
         var root = new Panel { Dock = DockStyle.Bottom, Height = 135, BackColor = Color.FromArgb(30, 34, 43), AccessibleName = "动画时间轴" };
@@ -41,8 +72,8 @@ public sealed partial class MainForm
         Add("删除", "删除当前帧（至少保留一帧）", DeleteAnimationFrame);
         Add("导入图", "将与画布同尺寸的图片导入为新帧", ImportAnimationFrame, 76);
         Add("精灵表", "将所有帧按网格导出为 PNG", ExportSpriteSheet, 76);
-        Add("←", "将当前帧左移（不能撤销）", () => MoveAnimationFrame(_activeFrame, _activeFrame - 1), 38);
-        Add("→", "将当前帧右移（不能撤销）", () => MoveAnimationFrame(_activeFrame, _activeFrame + 1), 38);
+        Add("←", "将当前帧左移（可撤销）", () => MoveAnimationFrame(_activeFrame, _activeFrame - 1), 38);
+        Add("→", "将当前帧右移（可撤销）", () => MoveAnimationFrame(_activeFrame, _activeFrame + 1), 38);
         _playButton = Add("播放", "循环播放或停止动画", ToggleAnimation);
         _onionCheck = new CheckBox { Text = "洋葱皮", Width = 76, Height = 30, ForeColor = Color.FromArgb(205, 218, 234), AccessibleName = "显示洋葱皮" };
         _toolTip.SetToolTip(_onionCheck, "显示前一帧（红）和后一帧（蓝）；播放和导出时不显示");
@@ -85,7 +116,7 @@ public sealed partial class MainForm
     private void MoveAnimationFrame(int source, int target)
     {
         if (_playing || _canvas.InteractionInProgress || source < 0 || source >= _frames.Count || target < 0 || target >= _frames.Count || source == target) return;
-        SyncCurrentFrame();
+        RecordFrameStructure();
         var active = _frames[_activeFrame]; var moved = _frames[source];
         _frames.RemoveAt(source); _frames.Insert(target, moved); _activeFrame = _frames.IndexOf(active);
         RefreshAnimationControls(); SetDirty();
@@ -121,6 +152,7 @@ public sealed partial class MainForm
             }
         }
         else { var layer = new Layer("图层 1", new PixelGrid(_grid.Width, _grid.Height)); layer.SetHistoryBudget(_historyBudget); layers.Add(layer); }
+        RecordFrameStructure();
         int next = _activeFrame + 1;
         _frames.Insert(next, new AnimationFrame(layers, copy ? _activeLayer : 0));
         SwitchFrame(next); SetDirty();
@@ -130,12 +162,13 @@ public sealed partial class MainForm
     {
         if (_playing || _canvas.InteractionInProgress) return;
         if (_frames.Count == 1) { MessageBox.Show(this, "至少保留一帧。", "动画帧"); return; }
-        if (MessageBox.Show(this, "删除当前帧及其图层？此操作无法撤销。", "删除帧", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
+        if (MessageBox.Show(this, "删除当前帧及其图层？（可用 Ctrl+Z 撤销）", "删除帧", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
         DeleteCurrentAnimationFrame();
     }
 
     private void DeleteCurrentAnimationFrame()
     {
+        RecordFrameStructure();
         foreach (var layer in _layers) layer.History.Clear();
         _frames.RemoveAt(_activeFrame);
         int next = Math.Min(_activeFrame, _frames.Count - 1);
@@ -194,6 +227,7 @@ public sealed partial class MainForm
         var frame = AnimationFrame.FromImage(source, _grid.Width, _grid.Height);
         SyncCurrentFrame();
         frame.Layers[0].SetHistoryBudget(_historyBudget);
+        RecordFrameStructure();
         int next = _activeFrame + 1; _frames.Insert(next, frame);
         SwitchFrame(next); SetDirty();
     }

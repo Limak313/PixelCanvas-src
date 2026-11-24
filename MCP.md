@@ -40,13 +40,13 @@ Codex 桌面插件使用其自身的插件管理方式；独立部署包与 Code
 
 用户正在拖动画布或绘制时，实时操作会返回错误，避免打断当前操作。隐藏图层不能绘制。批量像素写入在修改前检查所有参数；颜色格式为 `#RRGGBB` 或 `transparent`。
 
-多帧工程中，画布工具操作当前帧；`canvas_info` 返回帧数、当前帧索引、帧率和播放状态。`canvas_add_frame`、`canvas_select_frame`、`canvas_delete_frame`、`canvas_import_frame` 和 `canvas_set_playback` 可管理当前窗口的动画帧；帧索引从 0 开始，删除不可撤销且需明确确认。播放期间修改画布的 MCP 请求会被拒绝，停止播放后可继续编辑。工程文件工具修改当前帧并另存时会保留其他帧。
+多帧工程中，画布工具操作当前帧；`canvas_info` 返回帧数、当前帧索引、帧率和播放状态。`canvas_add_frame`、`canvas_select_frame`、`canvas_delete_frame`、`canvas_import_frame` 和 `canvas_set_playback` 可管理当前窗口的动画帧；帧索引从 0 开始，删除需明确确认，确认后仍可用 `canvas_undo` 撤销。播放期间修改画布的 MCP 请求会被拒绝，停止播放后可继续编辑。工程文件工具修改当前帧并另存时会保留其他帧。
 
 `canvas_export_gif` 和 `project_export_gif` 将全部帧导出为循环 GIF，未指定路径时保存到 `input\动画`。可指定 1–16 倍缩放，总输出像素（宽 × 高 × 帧数）不超过 16,777,216。GIF 保留透明像素和可见图层合成，但不保留独立图层；超过 255 种不透明颜色时量化。帧延时按 GIF 的百分之一秒精度近似帧率。要继续编辑请另存 `.pxproj`。
 
 `canvas_preview` 以 MCP 图片返回当前帧的可见图层合成 PNG，不含网格与参考图；`max_side` 为 1–512，默认 512。`canvas_batch_frames` 向末尾一次追加 1–32 帧；每项 `copy=true` 复制上一项（第一项复制当前帧），否则新建空白帧，每项可提供与 `canvas_batch_paint` 相同的 `operations`；可选 `fps`。整批成功后切换到最后一帧，失败不修改动画或帧率。整批最多 256 个操作、16384 个显式像素，每帧最多 64 操作；追加帧不可整体撤销。
 
-`canvas_move_frame` 使用从 0 开始的 `frame` 和 `target_index` 调整帧顺序，当前选中的帧保持选中，排序不可撤销；播放中需先停止。`canvas_set_onion_skin` 的 `enabled` 控制洋葱皮；`canvas_info` 中 `onionEnabled` 表示开关，`onionVisible` 表示当前是否显示，播放中会暂时隐藏。洋葱皮不进入合成预览、PNG 或 GIF。
+`canvas_move_frame` 使用从 0 开始的 `frame` 和 `target_index` 调整帧顺序，当前选中的帧保持选中，排序可用 `canvas_undo` 撤销；播放中需先停止。`canvas_undo` / `canvas_redo` 不传 `layer` 时按动作先后自动选择图层像素或帧结构，传 `layer` 时只作用于该图层。`canvas_set_onion_skin` 的 `enabled` 控制洋葱皮；`canvas_info` 中 `onionEnabled` 表示开关，`onionVisible` 表示当前是否显示，播放中会暂时隐藏。洋葱皮不进入合成预览、PNG 或 GIF。
 
 `canvas_export_sprite_sheet` 和 `project_export_sprite_sheet` 将全部帧从左到右、从上到下排列成 PNG；可选 `columns`（1–64，默认帧数平方根向上取整）和 `scale`（1–16）。结果的 `layout` 包含行列数、每帧尺寸和整图尺寸，空余单元格透明；不包含隐藏图层、网格、参考图和洋葱皮。单边最多 16384 像素、总计最多 16777216 像素。未指定输出路径时使用动画文件夹，不覆盖已有文件。
 

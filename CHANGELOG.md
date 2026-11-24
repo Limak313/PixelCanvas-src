@@ -7,6 +7,10 @@
 ### 新增
 - 应用图标：exe 内嵌 Win32 图标资源，窗体标题栏从自身 exe 提取（异常时静默兜底）；打包脚本把 ico 同步到插件 `app` 与部署包 `app`；`<Content>` 复制规则保证 clean/rebuild 后图标不丢失。
 - GitHub Actions 工作流两条：构建与测试（归档 trx 与 Release 产物）、Release 发布打包。
+- 帧操作可撤销：新增、复制、导入、删除、排序与批量加帧各记一步快照（`FrameUndo`，最多 32 步，按网格估算另设 64 MiB 预算）；Ctrl+Z / Ctrl+Y 与 `canvas_undo` / `canvas_redo` 均可回退或恢复。
+
+### 变更
+- 撤销 / 重做按全局动作序号推进（图层像素历史与帧结构快照共用计数器）：撤销取最新动作，命中非当前帧时自动切换过去；`canvas_undo` / `canvas_redo` 不传 `layer` 时走该自动选择，传 `layer` 时仍只作用于指定图层。
 
 ### 变更
 - 默认输出根目录由 `input` 改为 `output`，并按类型分入子目录：`.pxproj` → `工程`、GIF 与精灵表 → `动画`、普通 PNG → `PNG`；环境变量 `PIXELCANVAS_OUTPUT_DIR` 仍可整体覆盖根目录。`README`、`MCP.md` 与插件技能说明同步。

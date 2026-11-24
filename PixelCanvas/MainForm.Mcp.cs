@@ -277,6 +277,7 @@ public sealed partial class MainForm
         }
         foreach (var frame in staged) foreach (var layer in frame.Layers) layer.SetHistoryBudget(_historyBudget);
         SyncCurrentFrame();
+        RecordFrameStructure();
         int start = _frames.Count; _frames.AddRange(staged);
         SwitchFrame(_frames.Count - 1);
         if (_fps != fps) _fpsControl.Value = fps;
@@ -302,7 +303,7 @@ public sealed partial class MainForm
 
     private object DeleteFrameFromMcp(JsonObject args)
     {
-        if (args["confirm"]?.GetValue<bool>() != true) throw new ArgumentException("删除当前帧不可撤销，必须传入 confirm=true。");
+        if (args["confirm"]?.GetValue<bool>() != true) throw new ArgumentException("删除帧需要传入 confirm=true 确认（确认后仍可用 canvas_undo 撤销）。");
         if (_frames.Count <= 1) throw new InvalidOperationException("至少保留一帧。");
         DeleteCurrentAnimationFrame();
         return new { ok = true, data = FrameStatusFromMcp() };
@@ -326,6 +327,12 @@ public sealed partial class MainForm
 
     private object HistoryFromMcp(JsonObject args, bool redo)
     {
+        // 未指定图层时按动作先后自动选择：可能落在图层像素历史，也可能落在帧结构快照。
+        if (args["layer"] is null)
+        {
+            bool changed = StepHistory(redo);
+            return new { ok = true, data = new { changed, layer = _activeLayer, scope = "auto" } };
+        }
         int index = McpCanvas.LayerIndex(args, _layers, _activeLayer);
         var layer = _layers[index];
         var history = layer.History;

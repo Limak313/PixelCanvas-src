@@ -58,10 +58,13 @@ public class UiSmokeTests
             // 注意：SwitchFrame 会替换 _grid 指向的 Grid 对象，断言前必须重新取字段，不能缓存跨帧引用。
             Assert.Equal(Argb.FromRgb(0xFF0000), UiTestSupport.Field<PixelGrid>(form, "_grid").Get(0, 0));
 
+            // 撤销按全局动作先后：最新一笔是帧 1 上的绿笔画，因此自动切回帧 1，并恢复成复制时的红色。
             UiTestSupport.Handle(form, new { action = "undo", arguments = new { } });
-            Assert.Equal(Argb.Transparent, UiTestSupport.Field<PixelGrid>(form, "_grid").Get(0, 0));
+            Assert.Equal(1, UiTestSupport.Field<int>(form, "_activeFrame"));
+            Assert.Equal(Argb.FromRgb(0xFF0000), UiTestSupport.Field<PixelGrid>(form, "_grid").Get(0, 0));
 
-            UiTestSupport.Invoke(form, "SwitchFrame", 1);
+            // 重做该笔画，离线断言仍在帧 1 上。
+            UiTestSupport.Handle(form, new { action = "redo", arguments = new { } });
             Assert.Equal(Argb.FromRgb(0x00FF00), UiTestSupport.Field<PixelGrid>(form, "_grid").Get(0, 0));
 
             UiTestSupport.Invoke(form, "ToggleAnimation");
