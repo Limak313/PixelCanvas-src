@@ -11,7 +11,7 @@ internal static class SpriteSheetExport
         internal object ToData() => new { columns = Columns, rows = Rows, frameWidth = FrameWidth, frameHeight = FrameHeight, width = Width, height = Height, frameCount = FrameCount, scale = Scale };
     }
 
-    internal static Layout Save(string path, IReadOnlyList<AnimationFrame> frames, int columns, int scale)
+    internal static Layout Save(string path, IReadOnlyList<AnimationFrame> frames, int columns, int scale, bool overwrite = false)
     {
         if (frames.Count is < 1 or > ProjectFile.MaxFrames || columns is < 1 or > ProjectFile.MaxFrames || scale is < 1 or > 16)
             throw new ArgumentException("帧数、列数或放大倍数不合法。");
@@ -43,9 +43,7 @@ internal static class SpriteSheetExport
                     new Rectangle(0, 0, grid.Width, grid.Height), GraphicsUnit.Pixel);
             }
         }
-        using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-        try { sheet.Save(stream, ImageFormat.Png); }
-        catch { stream.Dispose(); try { File.Delete(path); } catch { } throw; }
+        AtomicFile.Write(path, stream => sheet.Save(stream, ImageFormat.Png), overwrite);
         return new Layout(columns, rows, frameWidth, frameHeight, width, height, frames.Count, scale);
     }
 }

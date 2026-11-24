@@ -87,9 +87,7 @@ public static class ProjectFile
         };
         string json = JsonSerializer.Serialize(dto);
         if (Encoding.UTF8.GetByteCount(json) > MaxFileBytes) throw new IOException($"工程文件超过 {MaxFileBytes / 1024 / 1024} MiB 上限，无法保存。");
-        string tmp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try { File.WriteAllText(tmp, json); File.Move(tmp, path, overwrite); }
-        catch { try { if (File.Exists(tmp)) File.Delete(tmp); } catch { } throw; }
+        AtomicFile.WriteText(path, json, overwrite);
     }
 
     private static string[] EncodeRows(PixelGrid grid)

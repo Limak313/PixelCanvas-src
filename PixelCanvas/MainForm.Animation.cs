@@ -204,17 +204,14 @@ public sealed partial class MainForm
         if (options.ShowDialog(this) != DialogResult.OK) return;
         using var dialog = new SaveFileDialog { Filter = "PNG 精灵表 (*.png)|*.png", InitialDirectory = OutputPaths.DirectoryPath(".png", animation: true), FileName = "sprite-sheet.png" };
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
-        string temp = dialog.FileName + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
             SyncCurrentFrame();
             int scale = _scaleCombo.SelectedIndex >= 0 ? ExportScales[_scaleCombo.SelectedIndex] : 1;
-            SpriteSheetExport.Save(temp, _frames, (int)columns.Value, scale);
-            File.Move(temp, dialog.FileName, overwrite: true);
+            SpriteSheetExport.Save(dialog.FileName, _frames, (int)columns.Value, scale, overwrite: true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or OverflowException or System.Runtime.InteropServices.ExternalException)
         { MessageBox.Show(this, "精灵表导出失败：" + ex.Message, "导出精灵表", MessageBoxButtons.OK, MessageBoxIcon.Error); }
-        finally { try { if (File.Exists(temp)) File.Delete(temp); } catch (IOException) { } }
     }
 
     private void ImportAnimationFrameFromPath(string path)

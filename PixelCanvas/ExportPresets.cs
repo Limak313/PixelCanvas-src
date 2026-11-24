@@ -57,12 +57,8 @@ internal static class ExportPresets
         items.RemoveAt(index); Write(folder, items);
     }
 
-    private static void Write(string folder, List<ExportPreset> items)
-    {
-        string target = Path.Combine(folder, "export-presets.json"), temp = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try { using (var file = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None)) JsonSerializer.Serialize(file, items); File.Move(temp, target, true); }
-        finally { try { if (File.Exists(temp)) File.Delete(temp); } catch (IOException) { } }
-    }
+    private static void Write(string folder, List<ExportPreset> items) =>
+        AtomicFile.Write(Path.Combine(folder, "export-presets.json"), stream => JsonSerializer.Serialize(stream, items));
 
     internal static string NewOutputPath(ExportPreset preset)
     {

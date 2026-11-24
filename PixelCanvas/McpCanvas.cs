@@ -291,7 +291,7 @@ internal static class McpCanvas
         return path;
     }
 
-    internal static void ExportPng(string path, IReadOnlyList<Layer> layers, int scale)
+    internal static void ExportPng(string path, IReadOnlyList<Layer> layers, int scale, bool overwrite = false)
     {
         if (scale is < 1 or > 16) throw new ArgumentException("放大倍数必须为 1–16。");
         var grid = layers[0].Grid;
@@ -313,8 +313,6 @@ internal static class McpCanvas
             g.PixelOffsetMode = PixelOffsetMode.Half;
             g.DrawImage(native, new Rectangle(0, 0, width, height), new Rectangle(0, 0, native.Width, native.Height), GraphicsUnit.Pixel);
         }
-        using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-        try { image.Save(stream, ImageFormat.Png); }
-        catch { stream.Dispose(); try { File.Delete(path); } catch { } throw; }
+        AtomicFile.Write(path, stream => image.Save(stream, ImageFormat.Png), overwrite);
     }
 }

@@ -29,10 +29,6 @@ internal static class PaletteFile
         return Validate(json["colors"]);
     }
 
-    internal static void Save(string path, IReadOnlyList<string> colors)
-    {
-        using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-        try { JsonSerializer.Serialize(file, new { format = "pixelcanvas-palette", version = 1, colors }); }
-        catch { file.Dispose(); try { File.Delete(path); } catch { } throw; }
-    }
+    internal static void Save(string path, IReadOnlyList<string> colors, bool overwrite = false) =>
+        AtomicFile.Write(path, stream => JsonSerializer.Serialize(stream, new { format = "pixelcanvas-palette", version = 1, colors }), overwrite);
 }

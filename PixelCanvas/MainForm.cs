@@ -721,11 +721,9 @@ public sealed partial class MainForm : Form
     {
         using var dialog = new SaveFileDialog { Filter = "PixelCanvas 调色板 (*.pxpal)|*.pxpal", InitialDirectory = OutputPaths.DirectoryPath(".pxpal"), FileName = "palette.pxpal" };
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
-        string temp = dialog.FileName + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try { PaletteFile.Save(temp, _palette); File.Move(temp, dialog.FileName, overwrite: true); }
+        try { PaletteFile.Save(dialog.FileName, _palette, overwrite: true); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         { MessageBox.Show(this, "无法保存调色板：" + ex.Message, "调色板", MessageBoxButtons.OK, MessageBoxIcon.Error); }
-        finally { try { if (File.Exists(temp)) File.Delete(temp); } catch (IOException) { } }
     }
 
     private void RebuildPaletteUi()
@@ -1193,9 +1191,7 @@ public sealed partial class MainForm : Form
             if (string.Equals(Path.GetExtension(dlg.FileName), ".gif", StringComparison.OrdinalIgnoreCase))
             {
                 SyncCurrentFrame();
-                string temp = dlg.FileName + "." + Guid.NewGuid().ToString("N") + ".tmp";
-                try { GifExport.Save(temp, _frames, _fps, scale); File.Move(temp, dlg.FileName, overwrite: true); }
-                finally { if (File.Exists(temp)) File.Delete(temp); }
+                GifExport.Save(dlg.FileName, _frames, _fps, scale, overwrite: true);
                 return;
             }
             using var bmp = new Bitmap(_grid.Width * scale, _grid.Height * scale, PixelFormat.Format32bppArgb);
@@ -1208,7 +1204,7 @@ public sealed partial class MainForm : Form
                     new Rectangle(0, 0, _grid.Width, _grid.Height),
                     GraphicsUnit.Pixel);
             }
-            bmp.Save(dlg.FileName, ImageFormat.Png);
+            AtomicFile.Write(dlg.FileName, stream => bmp.Save(stream, ImageFormat.Png), overwrite: true);
         }
         catch (Exception ex)
         {

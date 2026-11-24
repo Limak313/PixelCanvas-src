@@ -5,7 +5,7 @@ namespace PixelCanvas;
 /// <summary>将完整帧写为循环 GIF；透明像素使用索引 0。</summary>
 internal static class GifExport
 {
-    internal static void Save(string path, IReadOnlyList<AnimationFrame> frames, int fps, int scale)
+    internal static void Save(string path, IReadOnlyList<AnimationFrame> frames, int fps, int scale, bool overwrite = false)
     {
         if (frames.Count is < 1 or > ProjectFile.MaxFrames || fps is < 1 or > ProjectFile.MaxFps || scale is < 1 or > 16)
             throw new ArgumentException("帧数、帧率或缩放倍数不合法。");
@@ -25,8 +25,7 @@ internal static class GifExport
             }
             if (quantize) break;
         }
-        using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-        try
+        AtomicFile.Write(path, stream =>
         {
             using var writer = new BinaryWriter(stream, Encoding.ASCII, true);
             writer.Write(Encoding.ASCII.GetBytes("GIF89a")); writer.Write((ushort)width); writer.Write((ushort)height);
@@ -67,8 +66,7 @@ internal static class GifExport
                 writer.Write((byte)0);
             }
             writer.Write((byte)0x3B);
-        }
-        catch { stream.Dispose(); try { File.Delete(path); } catch { } throw; }
+        }, overwrite);
     }
 
     private static int[] Composite(AnimationFrame frame, int width, int height)
