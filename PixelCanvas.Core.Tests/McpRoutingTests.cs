@@ -42,10 +42,36 @@ public class McpRoutingTests
     }
 
     [Fact]
+    public async Task ToolInfo_UnknownActionWithoutCandidateExplainsLookup()
+    {
+        var node = await McpTestHost.InvokeAsync("pixelcanvas_tool_info", new { action = "zzzzzz" });
+        Assert.True(McpTestHost.IsError(node));
+        Assert.Contains("未知动作", McpTestHost.Text(node));
+        Assert.Contains("tool_info", McpTestHost.Text(node));
+    }
+
+    [Fact]
+    public async Task ToolInfo_AmbiguousAliasListsCandidates()
+    {
+        var node = await McpTestHost.InvokeAsync("pixelcanvas_tool_info", new { action = "export_png" });
+        Assert.True(McpTestHost.IsError(node));
+        Assert.Contains("canvas_export_png", McpTestHost.Text(node));
+        Assert.Contains("project_export_png", McpTestHost.Text(node));
+    }
+
+    [Fact]
     public async Task ToolInfo_UnknownAction_BatchRejected()
     {
         var node = await McpTestHost.InvokeAsync("pixelcanvas_tool_info", new { actions = new[] { "project_info", "unknown" } });
         Assert.True(McpTestHost.IsError(node));
+    }
+
+    [Fact]
+    public async Task ToolInfo_BatchInvalidItemRejected()
+    {
+        var node = await McpTestHost.InvokeAsync("pixelcanvas_tool_info", new { actions = new object[] { "project_info", 42 } });
+        Assert.True(McpTestHost.IsError(node));
+        Assert.Contains("有效的操作名称", McpTestHost.Text(node));
     }
 
     [Fact]
@@ -69,6 +95,29 @@ public class McpRoutingTests
         var node = await McpTestHost.InvokeAsync("pixelcanvas_files", new { action = "export_svg", arguments = new { path = "invalid" } });
         Assert.DoesNotContain("未知动作", McpTestHost.Text(node));
         Assert.DoesNotContain("有多个候选", McpTestHost.Text(node));
+    }
+
+    [Fact]
+    public async Task GroupedTool_EmptyActionRejected()
+    {
+        var node = await McpTestHost.InvokeAsync("pixelcanvas_project", new { action = "  ", arguments = new { path = "invalid" } });
+        Assert.True(McpTestHost.IsError(node));
+        Assert.Contains("必须是非空字符串", McpTestHost.Text(node));
+    }
+
+    [Fact]
+    public async Task GroupedTool_AcceptsCaseInsensitiveCanonicalName()
+    {
+        var node = await McpTestHost.InvokeAsync("pixelcanvas_project", new { action = "PROJECT_INFO", arguments = new { path = "invalid" } });
+        Assert.DoesNotContain("未知动作", McpTestHost.Text(node));
+    }
+
+    [Fact]
+    public async Task GroupedTool_RequiresArgumentsObject()
+    {
+        var node = await McpTestHost.InvokeAsync("pixelcanvas_project", new { action = "project_info" });
+        Assert.True(McpTestHost.IsError(node));
+        Assert.Contains("arguments", McpTestHost.Text(node));
     }
 
     [Fact]

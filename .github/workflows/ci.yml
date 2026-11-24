@@ -70,7 +70,8 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          $xmlFile = Get-ChildItem coverage -Recurse -Filter coverage.cobertura.xml | Select-Object -First 1
+          $merged = Join-Path coverage 'report/Cobertura.xml'
+          $xmlFile = if (Test-Path $merged) { Get-Item $merged } else { Get-ChildItem coverage -Recurse -Filter coverage.cobertura.xml | Select-Object -First 1 }
           if (-not $xmlFile) { throw '没有生成覆盖率报告，无法校验下限。' }
           [xml]$cov = Get-Content -LiteralPath $xmlFile.FullName
           $line = [double]$cov.coverage.'line-rate'

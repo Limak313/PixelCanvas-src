@@ -11,7 +11,7 @@
 - `arguments` 的公共字段（`path`、`output_path`、`x/y/width/height`、`color`、`scale`、`frame`、`layer`、`process_id`、`confirm`）写入 schema 描述，减少不必要的参数查询。
 
 ### 测试
-- 新增唯一别名、歧义候选、跨分组重定向、拼写建议与 `tool_info` 别名用例；核心测试增至 79 条。
+- 新增唯一别名、歧义候选、跨分组重定向、拼写建议与 `tool_info` 别名用例；核心测试增至 85 条，合并覆盖率门禁覆盖两套无头测试。
 
 ## [1.0.41] - 2026-11-24
 
