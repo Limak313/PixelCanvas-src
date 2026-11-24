@@ -59,16 +59,24 @@ dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Cate
 
 ## 发布打包
 
-打包脚本 `打包本地MCP.ps1` 先按 Release 构建，再把产物组装成携带 .NET 10 桌面运行时的自包含部署包并生成 zip：
+打包脚本 `打包本地MCP.ps1` 先按 Release 构建，再按 `-Mode` 组装部署包并生成 zip。默认 `Slim`：
 
 ```powershell
+# 框架依赖单文件精简包（约 1 MB，需要目标机已装 .NET 10 桌面运行时）
 powershell -NoProfile -ExecutionPolicy Bypass -File .\打包本地MCP.ps1
+
+# 自包含部署包（携带 .NET 10 桌面运行时，解压约 170 MB，免安装）
+powershell -NoProfile -ExecutionPolicy Bypass -File .\打包本地MCP.ps1 -Mode Bundle
+
+# 两种都出
+powershell -NoProfile -ExecutionPolicy Bypass -File .\打包本地MCP.ps1 -Mode All
 ```
 
-- 包名默认按 `Directory.Build.props` 的版本号生成（如 `PixelCanvas-Agent-1.0.36-win-x64`）；可用 `-PackageName` 覆盖。
+- 包名默认按 `Directory.Build.props` 的版本号生成：`PixelCanvas-<version>-win-x64-slim`（Slim）与 `PixelCanvas-Agent-<version>-win-x64`（Bundle）；可用 `-PackageName` 覆盖。
+- 两种包的 `app` 与 `server` 目录结构一致，靠 `server` 里是 `PixelCanvas.Mcp.exe`（精简）还是 `runtime\dotnet.exe` + `PixelCanvas.Mcp.dll`（自包含）区分，`Agent部署包\生成客户端配置.ps1` 会自动适配。
 - 默认会把 Release 产物同步刷新到插件目录 `pixelcanvas-plugin\plugins\pixelcanvas-desktop-v*\app` 与 `server`（排除 pdb）；`-NoPlugin` 可跳过刷新，`-NoPackage` 只刷新插件不生成部署包。
 - 生成的部署包目录、`.zip`、`output/` 均在 `.gitignore` 中，不纳入版本管理。
-- 部署包产出后，可用 `pixelcanvas-batch-check.ps1 -PackageRoot <部署包目录>` 做一次跨进程 MCP 绘画与读取校验。
+- 部署包产出后，可用 `pixelcanvas-batch-check.ps1 -PackageRoot <部署包目录>` 做一次跨进程 MCP 绘画与读取校验（两种包都支持）。
 
 ## 运行方法
 

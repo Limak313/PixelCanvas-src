@@ -1,11 +1,22 @@
 ﻿$ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $runtime = Join-Path $root 'runtime\dotnet.exe'
-$server = Join-Path $root 'server\PixelCanvas.Mcp.dll'
-if (!(Test-Path -LiteralPath $runtime -PathType Leaf) -or !(Test-Path -LiteralPath $server -PathType Leaf)) { throw '部署包不完整，请保留 runtime、server 和 app 文件夹。' }
+$serverDll = Join-Path $root 'server\PixelCanvas.Mcp.dll'
+$serverExe = Join-Path $root 'server\PixelCanvas.Mcp.exe'
+# 自包含包用 runtime\dotnet.exe 启动服务 dll；框架依赖的精简包直接启动单文件服务 exe。
+if (Test-Path -LiteralPath $runtime -PathType Leaf) {
+    if (!(Test-Path -LiteralPath $serverDll -PathType Leaf)) { throw '部署包不完整，请保留 runtime、server 和 app 文件夹。' }
+    $command = $runtime
+    $serverArgs = @($serverDll)
+} elseif (Test-Path -LiteralPath $serverExe -PathType Leaf) {
+    $command = $serverExe
+    $serverArgs = @()
+} else {
+    throw '部署包不完整：缺少 server\PixelCanvas.Mcp.exe（精简包）或 runtime\dotnet.exe + server\PixelCanvas.Mcp.dll（自包含包）。'
+}
 $output = Join-Path $root 'output'
 New-Item -ItemType Directory -Path $output -Force | Out-Null
-$config = @{ mcpServers = @{ pixelcanvas = @{ command = $runtime; args = @($server); env = @{ PIXELCANVAS_OUTPUT_DIR = $output } } } }
+$config = @{ mcpServers = @{ pixelcanvas = @{ command = $command; args = $serverArgs; env = @{ PIXELCANVAS_OUTPUT_DIR = $output } } } }
 $target = Join-Path $root 'mcp-config.json'
 if (Test-Path -LiteralPath $target) { throw "配置文件已存在：$target。请先备份或删除后重新生成。" }
 $json = $config | ConvertTo-Json -Depth 8

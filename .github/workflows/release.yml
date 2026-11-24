@@ -34,9 +34,9 @@ jobs:
           dotnet build PixelCanvas.slnx -c Release --nologo
           dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --no-build --nologo --filter "Category!=UI"
 
-      - name: Package self-contained deployment zip
+      - name: Package deployment zips (slim + self-contained)
         shell: pwsh
-        run: .\打包本地MCP.ps1
+        run: .\打包本地MCP.ps1 -Mode All
 
       - name: Package plugin zip
         shell: pwsh
@@ -54,6 +54,7 @@ jobs:
           $tag = $env:GITHUB_REF_NAME
           gh release create $tag `
             --title "PixelCanvas $version" `
-            --notes "Release $version（Windows x64 自包含部署包 + 插件包；无头核心测试门禁通过）" `
+            --notes "Release $version（Windows x64：精简包需 .NET 10 桌面运行时，自包含包免安装；另有 Agent 插件包。无头核心测试门禁通过）" `
+            "PixelCanvas-$version-win-x64-slim.zip" `
             "PixelCanvas-Agent-$version-win-x64.zip" `
             "pixelcanvas-plugin-$version.zip"

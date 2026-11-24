@@ -1,11 +1,19 @@
 ﻿param([Parameter(Mandatory = $true)][string]$PackageRoot)
 $ErrorActionPreference = 'Stop'
-$env:DOTNET_ROOT = Join-Path $PackageRoot 'runtime'
-$env:DOTNET_ROOT_X64 = $env:DOTNET_ROOT
+# 自包含包携带 runtime 目录；框架依赖的精简包直接跑单文件 exe。
+$runtimeExe = Join-Path $PackageRoot 'runtime\dotnet.exe'
+if (Test-Path -LiteralPath $runtimeExe) {
+    $env:DOTNET_ROOT = Join-Path $PackageRoot 'runtime'
+    $env:DOTNET_ROOT_X64 = $env:DOTNET_ROOT
+}
 $app = Start-Process -FilePath (Join-Path $PackageRoot 'app\PixelCanvas.exe') -ArgumentList '4','4' -PassThru
 $server = [Diagnostics.Process]::new()
-$server.StartInfo.FileName = Join-Path $PackageRoot 'runtime\dotnet.exe'
-$server.StartInfo.ArgumentList.Add((Join-Path $PackageRoot 'server\PixelCanvas.Mcp.dll'))
+if (Test-Path -LiteralPath $runtimeExe) {
+    $server.StartInfo.FileName = $runtimeExe
+    $server.StartInfo.ArgumentList.Add((Join-Path $PackageRoot 'server\PixelCanvas.Mcp.dll'))
+} else {
+    $server.StartInfo.FileName = Join-Path $PackageRoot 'server\PixelCanvas.Mcp.exe'
+}
 $server.StartInfo.UseShellExecute = $false
 $server.StartInfo.RedirectStandardInput = $true
 $server.StartInfo.RedirectStandardOutput = $true

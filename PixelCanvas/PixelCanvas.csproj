@@ -10,6 +10,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>Assets\pixelcanvas.ico</ApplicationIcon>
+    <!-- MCP 服务项目以「框架依赖单文件」发布时会引用本项目；显式声明非自包含，
+         避免 NETSDK1151（自包含可执行文件不能被非自包含可执行文件引用）。 -->
+    <SelfContained>false</SelfContained>
   </PropertyGroup>
 
   <ItemGroup>
