@@ -5,7 +5,8 @@ namespace PixelCanvas;
 /// <summary>横向帧缩略图；仅绘制滚动区域中可见的帧。</summary>
 internal sealed class FrameTimeline : Control
 {
-    private const int CellWidth = 78;
+    internal const int CellWidth = 78;
+    internal readonly record struct FrameDrop(int Pressed, int Target, bool Move);
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     internal IReadOnlyList<AnimationFrame> Frames { get; set; } = Array.Empty<AnimationFrame>();
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
@@ -75,14 +76,25 @@ internal sealed class FrameTimeline : Control
         if (_pressed >= Frames.Count) _pressed = -1;
     }
 
+    /// <summary>
+    /// 根据按下/松开坐标决定“移动帧”还是“选中帧”。抽成纯函数，避免测试依赖真实鼠标捕获与屏幕拖拽阈值。
+    /// </summary>
+    internal static FrameDrop ResolveDrop(int pressed, int downX, int upX, int frameCount, int dragThreshold)
+    {
+        if (pressed < 0 || pressed >= frameCount) return new(-1, -1, false);
+        int target = Math.Clamp(upX / CellWidth, 0, frameCount - 1);
+        bool move = Math.Abs(upX - downX) >= Math.Max(1, dragThreshold) / 2 && target != pressed;
+        return new(pressed, target, move);
+    }
+
     protected override void OnMouseUp(MouseEventArgs e)
     {
         base.OnMouseUp(e);
-        int pressed = _pressed; _pressed = -1;
-        if (e.Button != MouseButtons.Left || pressed < 0) return;
-        int target = Math.Clamp(e.X / CellWidth, 0, Frames.Count - 1);
-        if (Math.Abs(e.X - _down.X) >= SystemInformation.DragSize.Width / 2 && target != pressed) FrameMoved?.Invoke(pressed, target);
-        else FrameSelected?.Invoke(pressed);
+        var drop = ResolveDrop(_pressed, _down.X, e.X, Frames.Count, SystemInformation.DragSize.Width);
+        _pressed = -1;
+        if (e.Button != MouseButtons.Left || drop.Pressed < 0) return;
+        if (drop.Move) FrameMoved?.Invoke(drop.Pressed, drop.Target);
+        else FrameSelected?.Invoke(drop.Pressed);
     }
 
     protected override void OnMouseCaptureChanged(EventArgs e) { base.OnMouseCaptureChanged(e); if (!Capture) _pressed = -1; }

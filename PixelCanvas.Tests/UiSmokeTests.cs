@@ -13,8 +13,8 @@ namespace PixelCanvas.Tests;
 /// 播放定时器、批量绘画、组合工具、批量帧、洋葱皮、时间轴拖放、调色板与预设、双轴镜像、
 /// 图层合成、参考图、填充/渐变镜像、选区、图层、视图与尺寸调整等界面路径。
 /// 分组：只依赖「能创建窗体句柄」的用例标 Category=UiHost，随默认门禁进 CI；
-/// 依赖播放定时器消息泵或时间轴坐标映射的用例标 Category=UI，仅在本机交互式桌面执行
-/// （.\构建与测试.ps1 -Ui 或 --filter "Category=UI"）。
+/// 依赖真实 WinForms 定时器消息泵的用例标 Category=InteractiveUI，仅在本机交互式桌面执行
+/// （.\构建与测试.ps1 -Ui 或 --filter "Category=InteractiveUI"）。
 /// </summary>
 public class UiSmokeTests
 {
@@ -42,8 +42,8 @@ public class UiSmokeTests
     }
 
     [Fact]
-    [Trait("Category", "UI")]
-    public void FrameHistory_SwitchFrameUndoAndPlayback()
+    [Trait("Category", "UiHost")]
+    public void FrameHistory_SwitchFrameUndoAndRedo()
     {
         UiTestSupport.RunInSta(() =>
         {
@@ -66,12 +66,65 @@ public class UiSmokeTests
             // 重做该笔画，离线断言仍在帧 1 上。
             UiTestSupport.Handle(form, new { action = "redo", arguments = new { } });
             Assert.Equal(Argb.FromRgb(0x00FF00), UiTestSupport.Field<PixelGrid>(form, "_grid").Get(0, 0));
+        });
+    }
 
+    [Fact]
+    [Trait("Category", "UiHost")]
+    public void Playback_AdvanceByElapsedSwitchesFrame()
+    {
+        UiTestSupport.RunInSta(() =>
+        {
+            using var form = new MainForm(4, 4);
+            form.CreateControl();
+
+            UiTestSupport.Handle(form, new { action = "paint", arguments = new { pixels = new[] { new { x = 0, y = 0, color = "#FF0000" } } } });
+            UiTestSupport.Invoke(form, "AddAnimationFrame", true);
+            UiTestSupport.Invoke(form, "SwitchFrame", 0);
             UiTestSupport.Invoke(form, "ToggleAnimation");
             Assert.True(UiTestSupport.Field<bool>(form, "_playing"));
-            Thread.Sleep(180);
-            Application.DoEvents();
+            Assert.Equal(2, UiTestSupport.Field<List<AnimationFrame>>(form, "_frames").Count);
             Assert.Equal(0, UiTestSupport.Field<int>(form, "_activeFrame"));
+            Assert.Equal(8, UiTestSupport.Field<int>(form, "_fps"));
+
+            // 8 fps 下 elapsed=180ms 应前进 1 帧；直接注入耗时，不等待定时器消息。
+            UiTestSupport.Invoke(form, "AdvancePlayback", 180L);
+            Assert.Equal(1, UiTestSupport.Field<int>(form, "_activeFrame"));
+            Assert.Equal(Argb.FromRgb(0xFF0000), UiTestSupport.Field<PixelGrid>(form, "_grid").Get(0, 0));
+
+            UiTestSupport.Invoke(form, "AdvancePlayback", 0L);
+            Assert.Equal(1, UiTestSupport.Field<int>(form, "_activeFrame"));
+
+            UiTestSupport.Invoke(form, "ToggleAnimation");
+            Assert.False(UiTestSupport.Field<bool>(form, "_playing"));
+        });
+    }
+
+    [Fact]
+    [Trait("Category", "InteractiveUI")]
+    public void PlaybackTimer_AdvancesFrameOnRealMessagePump()
+    {
+        UiTestSupport.RunInSta(() =>
+        {
+            using var form = new MainForm(4, 4);
+            form.CreateControl();
+
+            UiTestSupport.Handle(form, new { action = "paint", arguments = new { pixels = new[] { new { x = 0, y = 0, color = "#FF0000" } } } });
+            UiTestSupport.Invoke(form, "AddAnimationFrame", true);
+            UiTestSupport.Invoke(form, "SwitchFrame", 0);
+
+            // 1 fps 把等待窗口拉宽到 1 秒，避免 8 fps 下 180ms 边界抖动。
+            UiTestSupport.Field<NumericUpDown>(form, "_fpsControl")!.Value = 1;
+            UiTestSupport.Invoke(form, "ToggleAnimation");
+            Assert.True(UiTestSupport.Field<bool>(form, "_playing"));
+
+            var deadline = DateTime.UtcNow.AddSeconds(4);
+            while (UiTestSupport.Field<int>(form, "_activeFrame") == 0 && DateTime.UtcNow < deadline)
+            {
+                Thread.Sleep(20);
+                Application.DoEvents();
+            }
+            Assert.Equal(1, UiTestSupport.Field<int>(form, "_activeFrame"));
 
             UiTestSupport.Invoke(form, "ToggleAnimation");
             Assert.False(UiTestSupport.Field<bool>(form, "_playing"));
@@ -192,7 +245,7 @@ public class UiSmokeTests
     }
 
     [Fact]
-    [Trait("Category", "UI")]
+    [Trait("Category", "UiHost")]
     public void AnimationFrames_OnionSkin_ReorderAndTimelineDrag()
     {
         using var dir = new TempDir();

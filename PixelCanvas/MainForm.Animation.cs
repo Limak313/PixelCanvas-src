@@ -95,12 +95,7 @@ public sealed partial class MainForm
         };
         bar.Controls.Add(_fpsControl);
         _animationTimer.Interval = AnimationClock.PollIntervalMs(_fps);
-        _animationTimer.Tick += (_, _) =>
-        {
-            if (!_playing || _canvas.InteractionInProgress || _frames.Count <= 1) return;
-            int index = AnimationClock.FrameIndex(_playClock.ElapsedMilliseconds, _fps, _frames.Count, _playStartFrame);
-            if (index != _activeFrame) SwitchFrame(index);
-        };
+        _animationTimer.Tick += (_, _) => AdvancePlayback(_playClock.ElapsedMilliseconds);
         var strip = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(5, 0, 5, 0), AccessibleName = "帧缩略图滚动区域" };
         _timeline = new FrameTimeline { Location = new Point(5, 0) };
         _timeline.FrameSelected += index => { if (!_playing) SwitchFrame(index); };
@@ -270,6 +265,17 @@ public sealed partial class MainForm
         RecordStructure();
         int next = _activeFrame + 1; _frames.Insert(next, frame);
         SwitchFrame(next); SetDirty();
+    }
+
+    /// <summary>
+    /// 按累计耗时推进播放帧。定时器只提供时间戳，测试可直接传入固定耗时验证帧切换，
+    /// 不依赖 WinForms 定时器与消息泵。
+    /// </summary>
+    internal void AdvancePlayback(long elapsedMs)
+    {
+        if (!_playing || elapsedMs <= 0 || _canvas.InteractionInProgress || _frames.Count <= 1) return;
+        int index = AnimationClock.FrameIndex(elapsedMs, _fps, _frames.Count, _playStartFrame);
+        if (index != _activeFrame) SwitchFrame(index);
     }
 
     private void ToggleAnimation()

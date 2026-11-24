@@ -6,7 +6,7 @@ namespace PixelCanvas.Tests;
 
 /// <summary>
 /// UI 宿主探针：只验证「当前会话能否创建 WinForms 窗体句柄」，不覆盖任何业务界面路径。
-/// 故意不加 Category=UI 标签，因此默认进入 CI 门禁——用来判断 windows runner 能否承载界面用例。
+/// 故意不加 Category=InteractiveUI 标签，因此默认进入 CI 门禁——用来判断 windows runner 能否承载界面用例。
 /// 本地单跑：--filter "Category=UiHost"
 /// </summary>
 [Trait("Category", "UiHost")]

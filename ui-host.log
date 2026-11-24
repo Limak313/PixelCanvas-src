@@ -1,0 +1,18 @@
+D:\像素画布\PixelCanvas.Tests\bin\Release\net10.0-windows\PixelCanvas.Tests.dll (.NETCoreApp,Version=v10.0)的测试运行
+总共 1 个测试文件与指定模式相匹配。
+[xUnit.net 00:00:01.39]     PixelCanvas.Tests.UiSmokeTests.Playback_AdvanceByElapsedSwitchesFrame [FAIL]
+  失败 PixelCanvas.Tests.UiSmokeTests.Playback_AdvanceByElapsedSwitchesFrame [21 ms]
+  错误消息:
+   Assert.Equal() Failure: Values differ
+Expected: 1
+Actual:   0
+  堆栈跟踪:
+     at PixelCanvas.Tests.UiSmokeTests.<>c.<Playback_AdvanceByElapsedSwitchesFrame>b__5_0() in D:\像素画布\PixelCanvas.Tests\UiSmokeTests.cs:line 93
+   at PixelCanvas.Tests.UiTestSupport.<>c__DisplayClass1_0.<RunInSta>b__0() in D:\像素画布\PixelCanvas.Tests\UiTestSupport.cs:line 24
+--- End of stack trace from previous location ---
+   at PixelCanvas.Tests.UiTestSupport.RunInSta(Action action) in D:\像素画布\PixelCanvas.Tests\UiTestSupport.cs:line 28
+   at PixelCanvas.Tests.UiSmokeTests.Playback_AdvanceByElapsedSwitchesFrame() in D:\像素画布\PixelCanvas.Tests\UiSmokeTests.cs:line 76
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+
+失败!  - 失败:     1，通过:    23，已跳过:     0，总计:    24，持续时间: 1 s - PixelCanvas.Tests.dll (net10.0)
