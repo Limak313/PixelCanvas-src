@@ -31,7 +31,8 @@ jobs:
 
       - name: Release build & headless tests (gate)
         run: |
-          dotnet build PixelCanvas.slnx -c Release --nologo
+          dotnet format whitespace PixelCanvas.slnx --verify-no-changes
+          dotnet build PixelCanvas.slnx -c Release --nologo -warnaserror
           dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --no-build --nologo --filter "Category!=UI"
 
       - name: Package deployment zips (slim + self-contained)
@@ -52,9 +53,15 @@ jobs:
         run: |
           $version = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version
           $tag = $env:GITHUB_REF_NAME
+          $changelog = Get-Content CHANGELOG.md -Raw
+          $section = [regex]::Match($changelog, "(?s)##\s*\[$([regex]::Escape($version))\].*?(?=\n##\s*\[|\z)").Value.Trim()
+          if (-not $section) { $section = "## [$version]" + [Environment]::NewLine + [Environment]::NewLine + "见 CHANGELOG。" }
+          $assets = [Environment]::NewLine + [Environment]::NewLine + "---" + [Environment]::NewLine + `
+            "Windows x64：``PixelCanvas-$version-win-x64-slim.zip`` 需 .NET 10 桌面运行时；``PixelCanvas-Agent-$version-win-x64.zip`` 自包含免安装；``pixelcanvas-plugin-$version.zip`` 为 Agent 插件。无头核心测试与格式门禁已在 CI 通过。"
+          Set-Content release-notes.md ($section + $assets) -Encoding utf8
           gh release create $tag `
             --title "PixelCanvas $version" `
-            --notes "Release $version（Windows x64：精简包需 .NET 10 桌面运行时，自包含包免安装；另有 Agent 插件包。无头核心测试门禁通过）" `
+            --notes-file release-notes.md `
             "PixelCanvas-$version-win-x64-slim.zip" `
             "PixelCanvas-Agent-$version-win-x64.zip" `
             "pixelcanvas-plugin-$version.zip"
