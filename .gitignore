@@ -37,3 +37,4 @@ TestResults/
 
 # 安装包产物
 PixelCanvas-*-setup.exe
+ui-*.log

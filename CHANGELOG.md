@@ -2,6 +2,18 @@
 
 本项目遵循语义化版本；版本号由根目录 `Directory.Build.props` 集中管理，桌面程序、MCP 服务与插件清单对齐同一版本。
 
+## [1.0.44] - 2026-11-24
+
+### 变更
+- 播放帧推进从 WinForms 定时器回调抽成 `MainForm.AdvancePlayback(elapsedMs)`，定时器只提供耗时；测试可直接注入时间，不再依赖 `Thread.Sleep` 与消息泵。
+- 时间轴落点判断抽成 `FrameTimeline.ResolveDrop(...)` 纯函数，`OnMouseUp` 只负责读取坐标并派发；拖拽阈值增加最小 1 像素保护。
+- 测试分类改名：`Category=UI` → `Category=InteractiveUI`。依赖窗体句柄但不依赖消息泵的用例全部回到 `Category=UiHost` 随 CI 运行；本机真交互冒烟从 2 条缩至 1 条（`PlaybackTimer_AdvancesFrameOnRealMessagePump`）。
+- 新增 `FrameTimelineDropTests` 6 条纯函数用例，覆盖跨帧拖拽、右边界钳制、同格点击、阈值不足、无效按下帧。
+
+### 测试
+- 无头门禁 135 条（Core 86 + Windows 49）全部通过；本机交互组 1 条通过。
+- 合并覆盖率提升到行 **64.3%**、分支 **46.4%**。
+
 ## [1.0.43] - 2026-11-24
 
 ### 变更
