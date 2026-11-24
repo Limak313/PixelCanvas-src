@@ -24,7 +24,9 @@ if ([string]::IsNullOrWhiteSpace($PackageRoot)) {
     $PackageRoot = Join-Path $projectRoot $tempBase
     if (-not $KeepPackage) { $cleanup = @($PackageRoot, (Join-Path $projectRoot "$tempBase.zip"), (Join-Path $projectRoot "$tempBase-build")) }
 }
+if (-not [System.IO.Path]::IsPathRooted($PackageRoot)) { $PackageRoot = Join-Path $projectRoot $PackageRoot }
 if (-not (Test-Path -LiteralPath $PackageRoot)) { throw "找不到部署包目录：$PackageRoot" }
+$PackageRoot = (Resolve-Path -LiteralPath $PackageRoot).Path
 
 New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
 $issPath = Join-Path $buildDir 'PixelCanvas.iss'
