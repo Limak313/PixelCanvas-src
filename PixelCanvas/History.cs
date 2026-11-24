@@ -118,4 +118,35 @@ public sealed class History
     public void ClearRedo() => ClearStack(_redo);
 
     public void Clear() { ClearStack(_undo); ClearStack(_redo); }
+
+    /// <summary>撤销栈内容（旧 → 新），供撤销历史落盘使用。</summary>
+    internal (int[] Pixels, long Seq)[] UndoEntries() => _undo.Select(entry => (entry.Pixels, entry.Seq)).ToArray();
+
+    /// <summary>重做栈内容（旧 → 新），供撤销历史落盘使用。</summary>
+    internal (int[] Pixels, long Seq)[] RedoEntries() => _redo.Select(entry => (entry.Pixels, entry.Seq)).ToArray();
+
+    /// <summary>
+    /// 用磁盘内容重建两个栈（顺序与内存一致：旧 → 新），并把全局动作序号推进到已见的最大值，
+    /// 避免恢复出的旧序号大于后续新动作、导致撤销顺序错乱。
+    /// </summary>
+    internal void Restore(IReadOnlyList<(int[] Pixels, long Seq)> undo, IReadOnlyList<(int[] Pixels, long Seq)> redo)
+    {
+        Clear();
+        foreach (var entry in undo) { Push(_undo, entry.Pixels, entry.Seq); ReserveSeq(entry.Seq); }
+        while (_undo.Count > MaxSteps) Evict(_undo[0]);
+        foreach (var entry in redo) { Push(_redo, entry.Pixels, entry.Seq); ReserveSeq(entry.Seq); }
+        while (_redo.Count > MaxSteps) Evict(_redo[0]);
+    }
+
+    /// <summary>把全局序号推进到至少 <paramref name="seq"/>。</summary>
+    internal static void ReserveSeq(long seq)
+    {
+        long current = Interlocked.Read(ref _seqCounter);
+        while (seq > current)
+        {
+            long seen = Interlocked.CompareExchange(ref _seqCounter, seq, current);
+            if (seen == current) return;
+            current = seen;
+        }
+    }
 }

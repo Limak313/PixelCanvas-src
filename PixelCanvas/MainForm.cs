@@ -1517,6 +1517,8 @@ public sealed partial class MainForm : Form
                     _layers = result.Layers;
                     _historyBudget = new HistoryBudget();
                     foreach (var frame in _frames) foreach (var layer in frame.Layers) layer.SetHistoryBudget(_historyBudget);
+                    // 撤销历史与副本一起恢复；文件缺失或与文档对不上时静默跳过，不影响作品本身。
+                    UndoJournal.TryLoad(Path.ChangeExtension(candidate, ".undo"), _frames, out _);
                     _structureUndo.Clear();
                     _activeLayer = result.ActiveLayer;
                     _grid = result.Grid;
@@ -1533,6 +1535,7 @@ public sealed partial class MainForm : Form
                     RebuildPaletteUi(); RestoreSizeSelection(); UpdateUndoButtons(); RefreshAnimationControls();
                     _dirty = true; UpdateTitle();
                     try { File.Delete(candidate); } catch { }
+                    try { File.Delete(Path.ChangeExtension(candidate, ".undo")); } catch { }
                     break;
                 }
             }
@@ -1551,6 +1554,7 @@ public sealed partial class MainForm : Form
         {
             SyncCurrentFrame();
             ProjectFile.Save(RecoveryPath, _layers, _activeLayer, _palette, frames: _frames, activeFrame: _activeFrame, framesPerSecond: _fps);
+            SaveRecoveryUndo();
             _autosaveErrorShown = false;
         }
         catch (Exception ex)
@@ -1561,9 +1565,17 @@ public sealed partial class MainForm : Form
         }
     }
 
+    /// <summary>把像素撤销栈写入副本旁；失败只影响撤销历史的可恢复性，不打断自动保存。</summary>
+    private void SaveRecoveryUndo()
+    {
+        try { UndoJournal.Save(RecoveryUndoPath, _frames); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { }
+    }
+
     private void DeleteOwnRecovery()
     {
         try { if (File.Exists(RecoveryPath)) File.Delete(RecoveryPath); } catch { }
+        try { if (File.Exists(RecoveryUndoPath)) File.Delete(RecoveryUndoPath); } catch { }
     }
 
     private void CloseRecovery()

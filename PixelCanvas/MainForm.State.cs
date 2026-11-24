@@ -23,6 +23,9 @@ public sealed partial class MainForm
     private readonly string _recoveryDirectory = AppPaths.RecoveryRoot;
     private readonly string _recoveryId = Guid.NewGuid().ToString("N");
     private string RecoveryPath => Path.Combine(_recoveryDirectory, _recoveryId + ".pxproj");
+
+    /// <summary>撤销历史的磁盘副本，与恢复副本同名不同扩展名。</summary>
+    private string RecoveryUndoPath => Path.Combine(_recoveryDirectory, _recoveryId + ".undo");
     private FileStream? _recoveryLock;
     private bool _autosaveErrorShown;
 

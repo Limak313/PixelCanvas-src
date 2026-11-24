@@ -90,26 +90,29 @@ public static class ProjectFile
         AtomicFile.WriteText(path, json, overwrite);
     }
 
-    private static string[] EncodeRows(PixelGrid grid)
+    internal static string[] EncodeRows(PixelGrid grid) => EncodeRows(grid.RawPixels, grid.Width, grid.Height);
+
+    /// <summary>把逐像素数组编码为按行 RLE（token 形如 NxRRGGBBAA）；撤销历史与工程文件共用同一格式。</summary>
+    internal static string[] EncodeRows(IReadOnlyList<int> pixels, int width, int height)
     {
-        var pixels = new string[grid.Height];
-        for (int y = 0; y < grid.Height; y++)
+        var rows = new string[height];
+        for (int y = 0; y < height; y++)
         {
             var sb = new StringBuilder();
             int x = 0;
-            while (x < grid.Width)
+            while (x < width)
             {
-                int color = grid.Get(x, y);
+                int color = pixels[y * width + x];
                 int run = 1;
-                while (x + run < grid.Width && grid.Get(x + run, y) == color) run++;
+                while (x + run < width && pixels[y * width + x + run] == color) run++;
                 if (sb.Length > 0) sb.Append(',');
                 sb.Append(run).Append('x').Append(ToRgbaHex(color));
                 x += run;
             }
-            pixels[y] = sb.ToString();
+            rows[y] = sb.ToString();
         }
 
-        return pixels;
+        return rows;
     }
 
     /// <summary>规范格式的 8 位十六进制：RRGGBBAA 顺序；透明像素统一编码为 00000000。</summary>
@@ -241,7 +244,7 @@ public static class ProjectFile
     }
 
     /// <summary>解析一行 RLE：形如 "3x00000000,2xFF0000FF"，所有 N 之和必须等于 width。</summary>
-    private static bool ParseRow(string line, int width, PixelGrid grid, int y)
+    internal static bool ParseRow(string line, int width, PixelGrid grid, int y)
     {
         int written = 0;
         foreach (var token in line.Split(','))
