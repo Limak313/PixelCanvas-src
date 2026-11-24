@@ -26,6 +26,20 @@
 - 导出 GIF：多帧画布的导出对话框默认选择循环 GIF，保存到动画文件夹；支持透明背景和 1×–16× 最近邻放大。GIF 最多使用 255 种不透明颜色，超过时会量化。普通工程保存仍为可编辑的 `.pxproj`。
 - 其他：网格线开关、悬停笔刷高亮、整数倍自动缩放（高 DPI 支持）。
 
+## 界面预览
+
+32×32 四图层工程：左侧工具与画布尺寸，中间画布，右侧调色板与图层列表，底部帧时间轴。
+
+![主界面](docs/images/main-window.png)
+
+放大到 18× 并开启网格，可以看到逐像素绘制与取色的精度：
+
+![网格细节](docs/images/grid-detail.png)
+
+同一工程的 5 帧眨眼动画，由 `canvas_export_gif` 以 8× 放大导出：
+
+![演示动画](docs/images/demo.gif)
+
 ## 构建命令
 
 需要 .NET 10 SDK（可在 [dotnet.microsoft.com](https://dotnet.microsoft.com) 下载，或 `winget install Microsoft.DotNet.SDK.10`）。版本号由根目录 `Directory.Build.props` 集中管理，桌面程序、MCP 服务与插件清单对齐。

@@ -20,6 +20,7 @@
 - 部署包分两种形态：默认 `-Mode Slim` 用 `dotnet publish -p:PublishSingleFile` 产出框架依赖单文件包（压缩 1.1 MB / 10 个文件，原来是 73.4 MB / 496 个文件；需目标机装 .NET 10 桌面运行时），`-Mode Bundle` 保留携带运行时的自包含包（73.4 MB），`-Mode All` 两种都出；`release.yml` 同时上传两个 zip。
 - `PixelCanvas.csproj` 显式声明 `<SelfContained>false</SelfContained>`，避免 MCP 服务以框架依赖单文件发布时引用可执行项目触发 NETSDK1151。
 - `pixelcanvas-batch-check.ps1` 与 `Agent部署包\生成客户端配置.ps1` 同时支持两种包形态（按 `server` 内容判断走 `runtime\dotnet.exe` + dll，还是直接跑单文件 exe）。
+- README 增加「界面预览」：主界面、18× 网格细节两张截图与一段 5 帧眨眼动画 GIF（`docs/images/`，由插件 MCP 实际绘制并截图导出）。
 - `canvas_delete_layer` 与界面删除图层不再清空被删图层的历史，撤销后该层像素与其撤销记录一并恢复。
 
 ### 测试
