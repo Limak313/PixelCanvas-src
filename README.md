@@ -55,7 +55,7 @@ dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Cate
 dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Category=UI"
 ```
 
-测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、绘画算法、调色板为无头可运行的核心用例（60 条）；`UiSmokeTests` 的 9 条界面路径用例标记 `Category=UI`，依赖交互式桌面会话与真实 DPI 环境，CI 门禁按标签排除，在本机用上面的 `-Ui` 方式执行。
+测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、绘画算法、调色板为无头可运行的核心用例（60 条）。`UiSmokeTests` 的 9 条界面路径用例按环境依赖分两组：7 条只要求能创建窗体句柄，标 `Category=UiHost`，随默认门禁进入 CI；2 条依赖播放定时器消息泵与时间轴坐标映射（`FrameHistory_SwitchFrameUndoAndPlayback`、`AnimationFrames_OnionSkin_ReorderAndTimelineDrag`），标 `Category=UI`，在本机用 `-Ui` 执行。`UiHostProbeTests` 的 2 条探针同属 `Category=UiHost`，用于确认运行环境能否承载界面用例。
 
 ## 发布打包
 

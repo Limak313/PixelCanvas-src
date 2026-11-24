@@ -12,11 +12,10 @@ namespace PixelCanvas.Tests;
 /// 交互式 WinForms 冒烟测试：在 STA 线程内创建窗体与控件，通过反射覆盖帧切换、独立撤销历史、
 /// 播放定时器、批量绘画、组合工具、批量帧、洋葱皮、时间轴拖放、调色板与预设、双轴镜像、
 /// 图层合成、参考图、填充/渐变镜像、选区、图层、视图与尺寸调整等界面路径。
-/// 除参考图一组外多数用例会创建 MainForm 句柄，依赖交互式桌面会话与真实 DPI 环境，故整类标记
-/// [Trait("Category", "UI")]：核心测试用 --filter "Category!=UI" 排除，手动跑用
-/// --filter "Category=UI"（或 .\构建与测试.ps1 -Ui）。
+/// 分组：只依赖「能创建窗体句柄」的用例标 Category=UiHost，随默认门禁进 CI；
+/// 依赖播放定时器消息泵或时间轴坐标映射的用例标 Category=UI，仅在本机交互式桌面执行
+/// （.\构建与测试.ps1 -Ui 或 --filter "Category=UI"）。
 /// </summary>
-[Trait("Category", "UI")]
 public class UiSmokeTests
 {
     private const BindingFlags Flags = UiTestSupport.InstanceNonPublic;
@@ -26,6 +25,7 @@ public class UiSmokeTests
     private static JsonNode Data(JsonNode node) => node["data"]!;
 
     [Fact]
+    [Trait("Category", "UiHost")]
     public void ReferenceControl_LoadsAndClearsSourcePath()
     {
         UiTestSupport.RunInSta(() =>
@@ -42,6 +42,7 @@ public class UiSmokeTests
     }
 
     [Fact]
+    [Trait("Category", "UI")]
     public void FrameHistory_SwitchFrameUndoAndPlayback()
     {
         UiTestSupport.RunInSta(() =>
@@ -75,6 +76,7 @@ public class UiSmokeTests
     }
 
     [Fact]
+    [Trait("Category", "UiHost")]
     public void BatchPaint_RollsBackOnInvalid_AndSaveExportReportsPartial()
     {
         using var dir = new TempDir();
@@ -134,6 +136,7 @@ public class UiSmokeTests
     }
 
     [Fact]
+    [Trait("Category", "UiHost")]
     public void CreateArtwork_SavesLayers_ReuseAndFailureStage()
     {
         using var dir = new TempDir();
@@ -186,6 +189,7 @@ public class UiSmokeTests
     }
 
     [Fact]
+    [Trait("Category", "UI")]
     public void AnimationFrames_OnionSkin_ReorderAndTimelineDrag()
     {
         using var dir = new TempDir();
@@ -281,6 +285,7 @@ public class UiSmokeTests
     }
 
     [Fact]
+    [Trait("Category", "UiHost")]
     public void Palette_ReplaceSaveLoad_AndPresetLifecycle()
     {
         using var dir = new TempDir();
@@ -349,6 +354,7 @@ public class UiSmokeTests
     }
 
     [Fact]
+    [Trait("Category", "UiHost")]
     public void Mirror_LayerComposite_AndReferenceImage()
     {
         using var dir = new TempDir();
@@ -398,6 +404,7 @@ public class UiSmokeTests
     }
 
     [Fact]
+    [Trait("Category", "UiHost")]
     public void FillAndGradient_MirrorDirection()
     {
         UiTestSupport.RunInSta(() =>
@@ -418,6 +425,7 @@ public class UiSmokeTests
     }
 
     [Fact]
+    [Trait("Category", "UiHost")]
     public void Selection_Layer_View_AndResize()
     {
         using var dir = new TempDir();
