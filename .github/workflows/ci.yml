@@ -124,3 +124,8 @@ jobs:
         run: >-
           dotnet test PixelCanvas.Core.Tests/PixelCanvas.Core.Tests.csproj
           -c Release --no-build --nologo
+
+      - name: MCP stdio smoke (file tools + PNG export)
+        run: >-
+          python .github/mcp-smoke.py
+          PixelCanvas.Mcp/bin/Release/net10.0/PixelCanvas.Mcp.dll
