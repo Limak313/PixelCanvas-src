@@ -39,6 +39,12 @@ jobs:
         shell: pwsh
         run: .\打包本地MCP.ps1 -Mode All
 
+      - name: Package installer (self-contained setup exe)
+        shell: pwsh
+        run: |
+          $version = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version
+          .\安装包\生成安装包.ps1 -PackageRoot "PixelCanvas-Agent-$version-win-x64"
+
       - name: Package plugin zip
         shell: pwsh
         run: |
@@ -57,11 +63,12 @@ jobs:
           $section = [regex]::Match($changelog, "(?s)##\s*\[$([regex]::Escape($version))\].*?(?=\n##\s*\[|\z)").Value.Trim()
           if (-not $section) { $section = "## [$version]" + [Environment]::NewLine + [Environment]::NewLine + "见 CHANGELOG。" }
           $assets = [Environment]::NewLine + [Environment]::NewLine + "---" + [Environment]::NewLine + `
-            "Windows x64：``PixelCanvas-$version-win-x64-slim.zip`` 需 .NET 10 桌面运行时；``PixelCanvas-Agent-$version-win-x64.zip`` 自包含免安装；``pixelcanvas-plugin-$version.zip`` 为 Agent 插件。无头核心测试与格式门禁已在 CI 通过。"
+            "Windows x64：``PixelCanvas-$version-win-x64-setup.exe`` 为自包含安装包（约 52 MB，无需预装 .NET，安装到当前用户目录并创建开始菜单与桌面快捷方式）；``PixelCanvas-$version-win-x64-slim.zip`` 为免安装精简包（需 .NET 10 桌面运行时）；``PixelCanvas-Agent-$version-win-x64.zip`` 为自包含免安装包；``pixelcanvas-plugin-$version.zip`` 为 Agent 插件。无头核心测试、覆盖率下限与格式门禁已在 CI 通过。"
           Set-Content release-notes.md ($section + $assets) -Encoding utf8
           gh release create $tag `
             --title "PixelCanvas $version" `
             --notes-file release-notes.md `
+            "PixelCanvas-$version-win-x64-setup.exe" `
             "PixelCanvas-$version-win-x64-slim.zip" `
             "PixelCanvas-Agent-$version-win-x64.zip" `
             "pixelcanvas-plugin-$version.zip"

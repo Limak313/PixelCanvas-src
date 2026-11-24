@@ -15,6 +15,11 @@ PixelCanvas-*/
 # 运行产出目录
 output/
 
+# 覆盖率报告与安装包中间产物
+coverage/
+安装包/_build/
+*.msi
+
 # 临时文件
 *.tmp
 *.tmp-*
@@ -27,3 +32,6 @@ TestResults/
 .vs/
 .trae/
 .workbuddy/
+
+# 安装包产物
+PixelCanvas-*-setup.exe

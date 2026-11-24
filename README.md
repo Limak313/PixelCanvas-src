@@ -58,6 +58,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\构建与测试.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\构建与测试.ps1 -Ui
 ```
 
+同时收集覆盖率（HTML 报告生成在 `coverage\report\index.html`，需本机装有 `reportgenerator`）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\构建与测试.ps1 -Coverage
+```
+
 或手动分步执行：
 
 ```powershell
@@ -71,7 +77,16 @@ dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Cate
 dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Category=UI"
 ```
 
-测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、原子写入、撤销历史落盘、绘画算法、调色板为无头可运行的核心用例；`UiSmokeTests` 的 9 条界面路径用例按环境依赖分两组：7 条只要求能创建窗体句柄，标 `Category=UiHost`，随默认门禁进入 CI；2 条依赖播放定时器消息泵与时间轴坐标映射（`FrameHistory_SwitchFrameUndoAndPlayback`、`AnimationFrames_OnionSkin_ReorderAndTimelineDrag`），标 `Category=UI`，在本机用 `-Ui` 执行。`FrameUndoTests`、`LayerUndoTests` 与 `UiHostProbeTests` 同属 `Category=UiHost`，分别覆盖帧与图层的结构撤销、以及运行环境能否承载界面用例；`UndoJournalTests` 为无头用例，覆盖撤销历史落盘的栈序还原、拒绝不匹配文件与步数截断；`ExportFormatsTests` 与 `McpExportFormatTests` 覆盖 SVG 色块合并、序列帧命名与缩放、非空目录拒绝，以及新增导出动作的 MCP 路由；`McpRoutingTests` 锁住「每个操作只属于一个分组入口、`tool_info` 枚举为并集」。当前门禁 112 条，本机 UI 组 2 条。
+测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、原子写入、撤销历史落盘、绘画算法、调色板为无头可运行的核心用例；`UiSmokeTests` 的 9 条界面路径用例按环境依赖分两组：7 条只要求能创建窗体句柄，标 `Category=UiHost`，随默认门禁进入 CI；2 条依赖播放定时器消息泵与时间轴坐标映射（`FrameHistory_SwitchFrameUndoAndPlayback`、`AnimationFrames_OnionSkin_ReorderAndTimelineDrag`），标 `Category=UI`，在本机用 `-Ui` 执行。`FrameUndoTests`、`LayerUndoTests` 与 `UiHostProbeTests` 同属 `Category=UiHost`，分别覆盖帧与图层的结构撤销、以及运行环境能否承载界面用例；`UndoJournalTests` 为无头用例，覆盖撤销历史落盘的栈序还原、拒绝不匹配文件与步数截断；`ExportFormatsTests` 与 `McpExportFormatTests` 覆盖 SVG 色块合并、序列帧命名与缩放、非空目录拒绝，以及新增导出动作的 MCP 路由；`McpRoutingTests` 锁住「每个操作只属于一个分组入口、`tool_info` 枚举为并集」。当前门禁 112 条，本机 UI 组 2 条。覆盖率由 coverlet 采集：当前行覆盖 **62.2%**（2404/3866 行）、分支 **42.8%**；CI 对行 55% / 分支 38% 设下限，低于下限即失败。
+
+## 安装（最终用户）
+
+发布页提供 `PixelCanvas-<version>-win-x64-setup.exe`（自包含安装包，约 52 MB）：
+
+1. 双击安装，安装到当前用户目录 `%LOCALAPPDATA%\Programs\PixelCanvas`，无需管理员权限、无需预装 .NET。
+2. 安装器创建开始菜单项与可选桌面快捷方式；卸载走“设置 → 应用”或安装目录里的 `unins000.exe`，不会删除你自己保存的工程与输出。
+3. 安装包未做代码签名，首次运行可能出现 SmartScreen 提示，选择“更多信息 → 仍要运行”即可。
+4. 只需要便携使用、或要接 Agent 插件时，仍可下载 zip 包，见下节。
 
 ## 发布打包
 
@@ -86,6 +101,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\打包本地MCP.ps1 -Mode 
 
 # 两种都出
 powershell -NoProfile -ExecutionPolicy Bypass -File .\打包本地MCP.ps1 -Mode All
+
+# 生成自包含安装包（默认先出 Bundle 部署包再压成 setup.exe，约 52 MB）
+powershell -NoProfile -ExecutionPolicy Bypass -File .\安装包\生成安装包.ps1
 ```
 
 - 包名默认按 `Directory.Build.props` 的版本号生成：`PixelCanvas-<version>-win-x64-slim`（Slim）与 `PixelCanvas-Agent-<version>-win-x64`（Bundle）；可用 `-PackageName` 覆盖。
@@ -93,6 +111,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\打包本地MCP.ps1 -Mode 
 - 默认会把 Release 产物同步刷新到插件目录 `pixelcanvas-plugin\plugins\pixelcanvas-desktop-v*\app` 与 `server`（排除 pdb）；`-NoPlugin` 可跳过刷新，`-NoPackage` 只刷新插件不生成部署包。
 - 生成的部署包目录、`.zip`、`output/` 均在 `.gitignore` 中，不纳入版本管理。
 - 部署包产出后，可用 `pixelcanvas-batch-check.ps1 -PackageRoot <部署包目录>` 做一次跨进程 MCP 绘画与读取校验（两种包都支持）。
+- 安装包脚本复用 Bundle 目录：`.\安装包\生成安装包.ps1 -PackageRoot PixelCanvas-Agent-<version>-win-x64` 可跳过重复打包；脚本需要 Inno Setup 6，本机缺失时会尝试从 GitHub 取官方安装器。
 
 ## 运行方法
 

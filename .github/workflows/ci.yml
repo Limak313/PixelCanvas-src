@@ -47,12 +47,41 @@ jobs:
       - name: Release build (warnings as errors)
         run: dotnet build PixelCanvas.slnx -c Release --no-restore --nologo -warnaserror
 
-      - name: Run headless tests (UI group excluded)
+      - name: Run headless tests (UI group excluded, coverage on)
         run: >-
           dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj
           -c Release --no-build --nologo
           --filter "Category!=UI"
+          --collect:"XPlat Code Coverage"
+          --results-directory coverage
           --logger "trx;LogFileName=pixelcanvas-tests.trx"
+
+      - name: Build coverage report
+        if: always()
+        run: |
+          dotnet tool install --global dotnet-reportgenerator-globaltool
+          reportgenerator "-reports:coverage/**/coverage.cobertura.xml" "-targetdir:coverage/report" -reporttypes:"Html;Cobertura"
+
+      - name: Enforce coverage floor (55% lines / 38% branches)
+        if: always()
+        shell: pwsh
+        run: |
+          $xmlFile = Get-ChildItem coverage -Recurse -Filter coverage.cobertura.xml | Select-Object -First 1
+          if (-not $xmlFile) { throw '没有生成覆盖率报告，无法校验下限。' }
+          [xml]$cov = Get-Content -LiteralPath $xmlFile.FullName
+          $line = [double]$cov.coverage.'line-rate'
+          $branch = [double]$cov.coverage.'branch-rate'
+          Write-Host ("覆盖率：行 {0:N1}%，分支 {1:N1}%" -f ($line * 100), ($branch * 100))
+          if ($line -lt 0.55) { throw "行覆盖率低于 55% 下限：$([math]::Round($line * 100, 1))%" }
+          if ($branch -lt 0.38) { throw "分支覆盖率低于 38% 下限：$([math]::Round($branch * 100, 1))%" }
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: coverage/report/
+          retention-days: 14
 
       - name: Upload test results
         if: always()
