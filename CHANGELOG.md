@@ -2,6 +2,10 @@
 
 本项目遵循语义化版本；版本号由根目录 `Directory.Build.props` 集中管理，桌面程序、MCP 服务与插件清单对齐同一版本。
 
+## [未发布]
+
+- 暂无待发布内容。
+
 ## [1.0.36] - 2026-11-24
 
 ### 新增
@@ -11,8 +15,6 @@
 
 ### 变更
 - 撤销 / 重做按全局动作序号推进（图层像素历史与帧结构快照共用计数器）：撤销取最新动作，命中非当前帧时自动切换过去；`canvas_undo` / `canvas_redo` 不传 `layer` 时走该自动选择，传 `layer` 时仍只作用于指定图层。
-
-### 变更
 - 默认输出根目录由 `input` 改为 `output`，并按类型分入子目录：`.pxproj` → `工程`、GIF 与精灵表 → `动画`、普通 PNG → `PNG`；环境变量 `PIXELCANVAS_OUTPUT_DIR` 仍可整体覆盖根目录。`README`、`MCP.md` 与插件技能说明同步。
 
 ### 规格上限
@@ -28,10 +30,11 @@
 ### 测试
 - 无头用例 48 → 60：新增帧数边界（128 帧往返、129 帧拒绝）、帧率边界（60 帧往返、61 帧拒绝），文件上限断言改为引用常量。
 - 补 `reuse_info` 可复用判定回归用例。
-- 9 条界面路径冒烟用例不再靠 `Skip` 沉底：整类标记 `[Trait("Category","UI")]`，CI 门禁与 `构建与测试.ps1` 默认按标签排除，本机 `-Ui`（或 `--filter "Category=UI"`）一键执行；实测 69 条全通过（60 无头 + 9 界面）。
+- 9 条界面路径冒烟用例不再靠 `Skip` 沉底：整类标记 `[Trait("Category","UI")]`，CI 门禁与 `构建与测试.ps1` 默认按标签排除，本机 `-Ui`（或 `--filter "Category=UI"`）一键执行；本机实测 9 条全部通过。
 - 新增 UI 宿主探针（`Category=UiHost`）：在 CI runner 上实测可创建 `MainForm` 句柄、可建画布控件句柄并 `DrawToBitmap`。
 - 据探针结果分级迁移：7 条只依赖窗体句柄的界面用例改标 `Category=UiHost` 进入 CI 门禁，仅播放定时器（`FrameHistory_SwitchFrameUndoAndPlayback`）与时间轴拖拽（`AnimationFrames_OnionSkin_ReorderAndTimelineDrag`）保留 `Category=UI` 在本机执行。
 - 关闭 xUnit 测试集合并行（`xunit.runner.json`）：`ExportTests` 与 `UiSmokeTests` 都会改写进程级 `PIXELCANVAS_OUTPUT_DIR`，并行时会出现拿到另一个临时目录的断言竞态（CI 首跑即暴露）；改串行后连跑稳定。
+- 新增帧撤销用例 5 条（`Category=UiHost`）：删帧、加帧、移帧、批量加帧的撤销与重做，以及撤销优先取更新的帧改动；门禁合计 74 条，CI 实跑 74/74 通过，本机另跑 2 条纯界面用例。
 
 ### 工程化
 - 插件目录名随版本改为 `pixelcanvas-desktop-v1036`，市场清单路径同步。
