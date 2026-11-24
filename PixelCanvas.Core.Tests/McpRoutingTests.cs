@@ -34,6 +34,14 @@ public class McpRoutingTests
     }
 
     [Fact]
+    public async Task ToolInfo_PrefixlessAliasResolves()
+    {
+        var node = await McpTestHost.InvokeAsync("pixelcanvas_tool_info", new { action = "export_svg" });
+        Assert.False(McpTestHost.IsError(node));
+        Assert.Contains("canvas_export_svg", McpTestHost.Text(node));
+    }
+
+    [Fact]
     public async Task ToolInfo_UnknownAction_BatchRejected()
     {
         var node = await McpTestHost.InvokeAsync("pixelcanvas_tool_info", new { actions = new[] { "project_info", "unknown" } });
@@ -52,6 +60,33 @@ public class McpRoutingTests
     {
         var node = await McpTestHost.InvokeAsync("pixelcanvas_draw", new { action = "project_info", arguments = new { path = "invalid" } });
         Assert.True(McpTestHost.IsError(node));
+        Assert.Contains("pixelcanvas_project", McpTestHost.Text(node));
+    }
+
+    [Fact]
+    public async Task GroupedTool_AcceptsUniquePrefixlessAlias()
+    {
+        var node = await McpTestHost.InvokeAsync("pixelcanvas_files", new { action = "export_svg", arguments = new { path = "invalid" } });
+        Assert.DoesNotContain("未知动作", McpTestHost.Text(node));
+        Assert.DoesNotContain("有多个候选", McpTestHost.Text(node));
+    }
+
+    [Fact]
+    public async Task GroupedTool_AmbiguousAliasListsCandidates()
+    {
+        var node = await McpTestHost.InvokeAsync("pixelcanvas_project", new { action = "export_png", arguments = new { path = "invalid" } });
+        Assert.True(McpTestHost.IsError(node));
+        Assert.Contains("canvas_export_png", McpTestHost.Text(node));
+        Assert.Contains("project_export_png", McpTestHost.Text(node));
+    }
+
+    [Fact]
+    public async Task GroupedTool_UnknownActionSuggestsClosest()
+    {
+        var node = await McpTestHost.InvokeAsync("pixelcanvas_project", new { action = "project_inf", arguments = new { path = "invalid" } });
+        Assert.True(McpTestHost.IsError(node));
+        Assert.Contains("project_info", McpTestHost.Text(node));
+        Assert.Contains("是否想用", McpTestHost.Text(node));
     }
 
     [Fact]
@@ -77,7 +112,7 @@ public class McpRoutingTests
             Assert.NotEmpty(actions);
             advertised.AddRange(actions);
             foreach (string action in actions)
-                Assert.Contains(action + "：", group["description"]!.GetValue<string>());
+                Assert.Contains(action, group["description"]!.GetValue<string>());
             Assert.Equal(new[] { "action", "arguments" }, schema["required"]!.AsArray().Select(n => n!.GetValue<string>()));
             Assert.False(schema["additionalProperties"]!.GetValue<bool>());
         }

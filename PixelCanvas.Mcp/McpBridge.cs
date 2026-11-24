@@ -261,25 +261,41 @@ public static class McpBridge
         return "pixelcanvas_draw";
     }
 
+    private static (string Hint, string Example) GroupGuide(string group) => group switch
+    {
+        "pixelcanvas_canvas" => ("窗口与画布：打开、复用、列出窗口，读取或调整画布尺寸。", "示例：open_canvas 打开画布；canvas_info 读当前尺寸与帧数。"),
+        "pixelcanvas_layers" => ("图层、选区与撤销：增删图层、调序、显隐、选区复制粘贴、撤销重做。", "示例：canvas_add_layer 新建图层；canvas_undo 撤销上一步。"),
+        "pixelcanvas_settings" => ("视图与外观：缩放/滚动、网格、参考图、工具选项、调色板。", "示例：canvas_view_set 设缩放；canvas_palette_set 换调色板。"),
+        "pixelcanvas_animation" => ("动画帧：新增/复制/删除/排序/导入帧，播放与洋葱皮。", "示例：canvas_add_frame 加帧；canvas_set_playback 播放。"),
+        "pixelcanvas_draw" => ("绘制与读像素：像素、形状、填充、渐变、区域复制移动。", "示例：canvas_batch_paint 批量画；canvas_read_pixels 读像素。"),
+        "pixelcanvas_files" => ("保存与导出：PNG、GIF、SVG、精灵表、序列帧、导出预设。", "示例：canvas_export_gif 导出动图；canvas_save_project 保存工程。"),
+        "pixelcanvas_project" => ("磁盘 .pxproj 工程：不依赖窗口，读取、修改另存、导出。", "示例：project_info 读工程；project_export_png 直接导出。"),
+        _ => ("", "")
+    };
+
     internal static object ListTools()
     {
         var definitions = ToolDefinitions().Select(node => (JsonObject)node!).ToArray();
         var tools = definitions.GroupBy(d => ToolGroup(d["name"]!.GetValue<string>()))
-            .Select(group => new
+            .Select(group =>
             {
-                name = group.Key,
-                description = "按 action 执行操作；参数放入 arguments。调用 pixelcanvas_tool_info 查询操作的完整参数和限制。操作：" +
-                    string.Join("；", group.Select(d => d["name"]!.GetValue<string>() + "：" + d["description"]!.GetValue<string>())),
-                inputSchema = new JsonObject
+                var guide = GroupGuide(group.Key);
+                var names = group.Select(d => d["name"]!.GetValue<string>()).ToArray();
+                return new
                 {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject
+                    name = group.Key,
+                    description = $"{guide.Hint} 动作：{string.Join("、", names)}。{guide.Example}参数格式用 pixelcanvas_tool_info 查询。",
+                    inputSchema = new JsonObject
                     {
-                        ["action"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray(group.Select(d => (JsonNode?)JsonValue.Create(d["name"]!.GetValue<string>())).ToArray()) },
-                        ["arguments"] = new JsonObject { ["type"] = "object", ["description"] = "操作参数；先通过 pixelcanvas_tool_info 查询精确格式。" }
-                    },
-                    ["required"] = new JsonArray("action", "arguments"), ["additionalProperties"] = false
-                }
+                        ["type"] = "object",
+                        ["properties"] = new JsonObject
+                        {
+                            ["action"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray(names.Select(n => (JsonNode?)JsonValue.Create(n)).ToArray()) },
+                            ["arguments"] = new JsonObject { ["type"] = "object", ["description"] = "常用字段：path、output_path、x、y、width、height、color、scale、frame、layer、process_id、confirm；完整格式用 pixelcanvas_tool_info 查询。" }
+                        },
+                        ["required"] = new JsonArray("action", "arguments"), ["additionalProperties"] = false
+                    }
+                };
             }).Cast<object>().ToList();
         tools.Add(new
         {
@@ -349,6 +365,54 @@ public static class McpBridge
         };
     }
 
+    private static string ResolveAction(string? tool, string requested)
+    {
+        if (string.IsNullOrWhiteSpace(requested)) throw new ArgumentException("action 不能为空。");
+        var definitions = ToolDefinitions().Select(node => (JsonObject)node!).ToArray();
+        var names = definitions.Select(d => d["name"]!.GetValue<string>()).ToArray();
+
+        string? exact = names.FirstOrDefault(n => string.Equals(n, requested, StringComparison.OrdinalIgnoreCase));
+        if (exact is not null) return tool is null ? exact : EnsureGroup(tool, exact);
+
+        // 容忍省略 canvas_ / project_ 前缀的写法；唯一匹配时直接放行，多义时要求带前缀。
+        string trimmed = requested.Trim();
+        var aliases = names.Where(n => n.EndsWith("_" + trimmed, StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (aliases.Length == 1) return tool is null ? aliases[0] : EnsureGroup(tool, aliases[0]);
+        if (aliases.Length > 1)
+            throw new ArgumentException($"动作 {requested} 有多个候选：{string.Join("、", aliases)}；请带完整前缀，或先调用 pixelcanvas_tool_info。");
+
+        var closest = names.Select(n => (Name: n, Distance: EditDistance(n, trimmed)))
+            .Where(x => x.Distance <= Math.Max(2, trimmed.Length / 3))
+            .OrderBy(x => x.Distance).ThenBy(x => x.Name, StringComparer.Ordinal)
+            .Take(3).Select(x => x.Name).ToArray();
+        string hint = closest.Length > 0 ? $"是否想用：{string.Join("、", closest)}？" : "可用 pixelcanvas_tool_info 查看全部动作。";
+        throw new ArgumentException($"未知动作 {requested}。{hint}");
+    }
+
+    private static string EnsureGroup(string tool, string action)
+    {
+        string group = ToolGroup(action);
+        return group == tool ? action : throw new ArgumentException($"动作 {action} 属于 {group}，请改用 {group} 调用。");
+    }
+
+    private static int EditDistance(string left, string right)
+    {
+        int[] previous = new int[right.Length + 1];
+        int[] current = new int[right.Length + 1];
+        for (int j = 0; j <= right.Length; j++) previous[j] = j;
+        for (int i = 1; i <= left.Length; i++)
+        {
+            current[0] = i;
+            for (int j = 1; j <= right.Length; j++)
+            {
+                int cost = char.ToLowerInvariant(left[i - 1]) == char.ToLowerInvariant(right[j - 1]) ? 0 : 1;
+                current[j] = Math.Min(Math.Min(current[j - 1] + 1, previous[j] + 1), previous[j - 1] + cost);
+            }
+            (previous, current) = (current, previous);
+        }
+        return previous[right.Length];
+    }
+
     internal static async Task<object> CallToolAsync(JsonObject request)
     {
         try
@@ -367,22 +431,21 @@ public static class McpBridge
                     {
                         if (item is not JsonValue value || !value.TryGetValue<string>(out string? action) || string.IsNullOrEmpty(action))
                             throw new ArgumentException("actions 必须包含有效的操作名称。");
-                        var matched = definitions.FirstOrDefault(d => d!["name"]!.GetValue<string>() == action)
+                        string resolved = ResolveAction(null, action);
+                        var matched = definitions.FirstOrDefault(d => d!["name"]!.GetValue<string>() == resolved)
                             ?? throw new ArgumentException($"未知操作：{action}。");
                         result.Add(matched.DeepClone());
                     }
                     return new { content = new[] { new { type = "text", text = result.ToJsonString(JsonOptions) } }, isError = false };
                 }
-                string operation = McpCanvas.Text(args, "action");
+                string operation = ResolveAction(null, McpCanvas.Text(args, "action"));
                 var definition = ToolDefinitions().FirstOrDefault(d => d!["name"]!.GetValue<string>() == operation)
                     ?? throw new ArgumentException("未知操作。");
                 return new { content = new[] { new { type = "text", text = definition.ToJsonString(JsonOptions) } }, isError = false };
             }
             if (name.StartsWith("pixelcanvas_", StringComparison.Ordinal))
             {
-                string operation = McpCanvas.Text(args, "action");
-                if (!ToolDefinitions().Any(d => d!["name"]!.GetValue<string>() == operation && ToolGroup(operation) == name))
-                    throw new ArgumentException("该操作不属于此工具或不存在。");
+                string operation = ResolveAction(name, McpCanvas.Text(args, "action"));
                 args = args["arguments"] as JsonObject ?? throw new ArgumentException("arguments 必须是对象。");
                 name = operation;
             }

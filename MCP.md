@@ -16,6 +16,8 @@ Codex 桌面插件使用其自身的插件管理方式；独立部署包与 Code
 
 先从分组工具的描述中选择操作名，再用 `pixelcanvas_tool_info` 的 `action` 查询参数。调用分组工具时将原操作名放在 `action`，原参数对象放在 `arguments`，例如 `pixelcanvas_project` 的参数为 `{"action":"project_info","arguments":{"path":"C:\\art\\example.pxproj"}}`。下文列出的原名称均是操作名。为兼容已有客户端，服务仍接受直接使用原名称的调用，但不会在 `tools/list` 中列出这些旧名称。客户端通常需要重启或刷新 MCP 工具列表才能看到新入口；已安装的旧版本插件或部署包不会自动更新。
 
+分组描述只列出“用途 + 动作名 + 示例”，完整参数与限制统一由 `pixelcanvas_tool_info` 提供，避免 `tools/list` 携带全部 78 段说明。省略 `canvas_` / `project_` 前缀的写法在唯一匹配时可直接使用（如 `export_svg`）；多义时（如 `export_png` 同时属于画布与磁盘工程）会返回候选，要求带完整前缀。选错分组时会提示动作实际所属的工具，拼错动作时会给出最接近的候选。
+
 要一次查询多个操作，可传 `{"actions":["canvas_reference_info","canvas_import_frame","canvas_export_png"]}`，最多 32 个，结果按请求顺序返回。`action` 与 `actions` 不能同时提供；有未知名称时整次查询返回错误。
 
 当前工程与绘画采用二值透明：导入帧时 alpha 小于 128 的像素变为透明，其余变为不透明；读取工程时 alpha 为 0 视为透明，其他值视为不透明，保存时只写入 00 或 FF。PNG 导出不能保留半透明像素，手工写入半透明 `.pxproj` 也不能绕过此限制。需要精确保留半透明时，应保留原始图像并在支持完整 alpha 的工具中处理。
