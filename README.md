@@ -16,7 +16,7 @@
 - 精灵表：动画栏点击“精灵表”，设置每行帧数，按当前导出放大倍数将全部帧依次导出为透明 PNG 网格。
 - 导出预设：右侧“导出设置”可保存和复用 PNG、GIF、精灵表的缩放、GIF 帧率、精灵表列数及输出目录；按预设导出会创建新文件，GIF 预设帧率不修改工程帧率。
 - 颜色管理：可替换当前帧当前图层中的一种颜色（可撤销），并删除调色板颜色、保存及加载 `.pxpal` 色板；调色板随 `.pxproj` 工程保存。
-- 撤销 / 重做：Ctrl+Z / Ctrl+Y（或 Ctrl+Shift+Z），每个图层最多 100 步，一整笔一步；所有图层的历史共用 64 MiB 上限，超限时最早的记录会被移除。帧的新增、复制、导入、删除、排序与批量加帧各记一步快照（最多 32 步，按网格估算占用另设 64 MiB 预算），撤销按全局动作先后推进，命中非当前帧时自动切换过去。图层管理操作仍不可撤销。
+- 撤销 / 重做：Ctrl+Z / Ctrl+Y（或 Ctrl+Shift+Z），每个图层最多 100 步，一整笔一步；所有图层的历史共用 64 MiB 上限，超限时最早的记录会被移除。结构与像素共用同一条动作链：帧的新增、复制、导入、删除、排序、批量加帧，以及图层的新增、删除、排序、显隐切换各记一步结构快照（最多 32 步，按网格估算占用另设 64 MiB 预算）；撤销按全局动作先后推进，命中非当前帧时自动切换过去。
 - 工程保存 / 载入：Ctrl+S / Ctrl+O，`.pxproj`（UTF-8 JSON，按行 RLE 像素编码）；多帧工程保存全部帧、图层和帧率，并可读取旧版单帧工程。旧版程序无法打开多帧工程。
 - 工程文件上限：256 MiB，调色板最多 1024 色；超限时会提示错误并保留现有文件。旧版工程同样适用此上限。
 - 自动保存与恢复：未保存的修改每分钟写入独立恢复副本；异常退出后下次启动可恢复，恢复后需手动保存工程。
@@ -55,7 +55,7 @@ dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Cate
 dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Category=UI"
 ```
 
-测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、绘画算法、调色板为无头可运行的核心用例（60 条）。`UiSmokeTests` 的 9 条界面路径用例按环境依赖分两组：7 条只要求能创建窗体句柄，标 `Category=UiHost`，随默认门禁进入 CI；2 条依赖播放定时器消息泵与时间轴坐标映射（`FrameHistory_SwitchFrameUndoAndPlayback`、`AnimationFrames_OnionSkin_ReorderAndTimelineDrag`），标 `Category=UI`，在本机用 `-Ui` 执行。`UiHostProbeTests` 的 2 条探针同属 `Category=UiHost`，用于确认运行环境能否承载界面用例。
+测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、原子写入、绘画算法、调色板为无头可运行的核心用例；`UiSmokeTests` 的 9 条界面路径用例按环境依赖分两组：7 条只要求能创建窗体句柄，标 `Category=UiHost`，随默认门禁进入 CI；2 条依赖播放定时器消息泵与时间轴坐标映射（`FrameHistory_SwitchFrameUndoAndPlayback`、`AnimationFrames_OnionSkin_ReorderAndTimelineDrag`），标 `Category=UI`，在本机用 `-Ui` 执行。`FrameUndoTests`、`LayerUndoTests` 与 `UiHostProbeTests` 同属 `Category=UiHost`，分别覆盖帧与图层的结构撤销、以及运行环境能否承载界面用例。当前门禁 95 条，本机 UI 组 2 条。
 
 ## 发布打包
 
@@ -73,3 +73,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\打包本地MCP.ps1
 ## 运行方法
 
 双击桌面的“PixelCanvas 新版”快捷方式，或运行仓库根目录的 `启动PixelCanvas.ps1`。快捷方式打开已安装的 PixelCanvas Desktop 插件所附带的画布，需安装 .NET 10 桌面运行时。本地 MCP 使用仅限当前用户的命名管道，不监听网络端口。
+
+## 许可
+
+MIT License，见 [`LICENSE`](LICENSE)。可自由使用、修改、分发与商用，保留版权声明即可。第三方依赖（.NET 运行时、WinForms）遵循其各自许可。

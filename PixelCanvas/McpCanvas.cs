@@ -252,9 +252,8 @@ internal static class McpCanvas
         int index = LayerIndex(args, layers, active);
         if (action == "delete")
         {
-            if (args["confirm"]?.GetValue<bool>() != true) throw new ArgumentException("删除图层不可撤销，必须传入 confirm=true。");
+            if (args["confirm"]?.GetValue<bool>() != true) throw new ArgumentException("删除图层会丢掉该层像素（可用 canvas_undo 撤销），必须传入 confirm=true。");
             if (layers.Count == 1) throw new ArgumentException("至少保留一个图层。");
-            layers[index].History.Clear();
             layers.RemoveAt(index);
             if (index < active) active--;
             else if (index == active) active = Math.Min(active, layers.Count - 1);

@@ -6,7 +6,7 @@ namespace PixelCanvas;
 public sealed partial class MainForm
 {
     private readonly System.Windows.Forms.Timer _animationTimer = new();
-    private readonly FrameUndo _frameUndo = new();
+    private readonly StructureUndo _structureUndo = new();
     private FrameTimeline? _timeline;
     private CheckBox? _onionCheck;
     private NumericUpDown _fpsControl = null!;
@@ -26,25 +26,28 @@ public sealed partial class MainForm
         return _frames.Count < ProjectFile.MaxFrames && pixels + (long)layerCount * _grid.Width * _grid.Height <= ProjectFile.MaxAnimationPixels;
     }
 
-    /// <summary>当前结构的快照（先把正在编辑的图层引用同步回当前帧）。</summary>
-    private FrameUndo.Snapshot CaptureFrames()
+    /// <summary>当前结构（帧与图层）的快照（先把正在编辑的图层引用同步回当前帧）。</summary>
+    private StructureUndo.Snapshot CaptureStructure()
     {
         SyncCurrentFrame();
-        return _frameUndo.Capture(_frames, _activeFrame);
+        return _structureUndo.Capture(_frames, _activeFrame);
     }
 
-    /// <summary>记录一次帧结构改动之前的快照；结构改动属于新动作，所有重做同时失效。</summary>
-    private void RecordFrameStructure()
+    /// <summary>记录一次结构改动之前的快照；结构改动属于新动作，所有重做同时失效。</summary>
+    private void RecordStructure() => CommitStructure(CaptureStructure());
+
+    private void CommitStructure(StructureUndo.Snapshot before)
     {
-        _frameUndo.Commit(CaptureFrames());
+        _structureUndo.Commit(before);
         foreach (var frame in _frames) foreach (var layer in frame.Layers) layer.History.ClearRedo();
         UpdateUndoButtons();
     }
 
-    /// <summary>把帧列表与当前帧恢复到快照状态，并重建画布、图层与时间轴绑定。</summary>
-    private void RestoreFrameSnapshot(FrameUndo.Snapshot snapshot)
+    /// <summary>把帧与图层结构恢复到快照状态，并重建画布、图层列表与时间轴绑定。</summary>
+    private void RestoreStructureSnapshot(StructureUndo.Snapshot snapshot)
     {
-        _frames = snapshot.Frames.ToList();
+        var frames = _structureUndo.Restore(snapshot);
+        _frames = frames.ToList();
         _activeFrame = Math.Clamp(snapshot.ActiveFrame, 0, _frames.Count - 1);
         _layers = _frames[_activeFrame].Layers;
         _activeLayer = Math.Clamp(_frames[_activeFrame].ActiveLayer, 0, _layers.Count - 1);
@@ -81,10 +84,22 @@ public sealed partial class MainForm
         bar.Controls.Add(_onionCheck);
         bar.Controls.Add(new Label { Text = "帧/秒", Width = 48, Height = 30, ForeColor = Color.FromArgb(205, 218, 234), TextAlign = ContentAlignment.MiddleLeft });
         _fpsControl = new NumericUpDown { Minimum = 1, Maximum = ProjectFile.MaxFps, Value = 8, Width = 55, Margin = new Padding(0, 3, 0, 0), AccessibleName = "每秒帧数" };
-        _fpsControl.ValueChanged += (_, _) => { if (_updatingFrames) return; _fps = (int)_fpsControl.Value; _animationTimer.Interval = Math.Max(1, 1000 / _fps); SetDirty(); };
+        _fpsControl.ValueChanged += (_, _) =>
+        {
+            if (_updatingFrames) return;
+            _fps = (int)_fpsControl.Value;
+            _animationTimer.Interval = AnimationClock.PollIntervalMs(_fps);
+            if (_playing) { _playStartFrame = _activeFrame; _playClock.Restart(); }   // 播放中改帧率：从当前帧重新计时，避免按旧速率跳到远处
+            SetDirty();
+        };
         bar.Controls.Add(_fpsControl);
-        _animationTimer.Interval = 125;
-        _animationTimer.Tick += (_, _) => { if (!_canvas.InteractionInProgress) SwitchFrame((_activeFrame + 1) % _frames.Count); };
+        _animationTimer.Interval = AnimationClock.PollIntervalMs(_fps);
+        _animationTimer.Tick += (_, _) =>
+        {
+            if (!_playing || _canvas.InteractionInProgress || _frames.Count <= 1) return;
+            int index = AnimationClock.FrameIndex(_playClock.ElapsedMilliseconds, _fps, _frames.Count, _playStartFrame);
+            if (index != _activeFrame) SwitchFrame(index);
+        };
         var strip = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(5, 0, 5, 0), AccessibleName = "帧缩略图滚动区域" };
         _timeline = new FrameTimeline { Location = new Point(5, 0) };
         _timeline.FrameSelected += index => { if (!_playing) SwitchFrame(index); };
@@ -116,7 +131,7 @@ public sealed partial class MainForm
     private void MoveAnimationFrame(int source, int target)
     {
         if (_playing || _canvas.InteractionInProgress || source < 0 || source >= _frames.Count || target < 0 || target >= _frames.Count || source == target) return;
-        RecordFrameStructure();
+        RecordStructure();
         var active = _frames[_activeFrame]; var moved = _frames[source];
         _frames.RemoveAt(source); _frames.Insert(target, moved); _activeFrame = _frames.IndexOf(active);
         RefreshAnimationControls(); SetDirty();
@@ -152,7 +167,7 @@ public sealed partial class MainForm
             }
         }
         else { var layer = new Layer("图层 1", new PixelGrid(_grid.Width, _grid.Height)); layer.SetHistoryBudget(_historyBudget); layers.Add(layer); }
-        RecordFrameStructure();
+        RecordStructure();
         int next = _activeFrame + 1;
         _frames.Insert(next, new AnimationFrame(layers, copy ? _activeLayer : 0));
         SwitchFrame(next); SetDirty();
@@ -168,7 +183,7 @@ public sealed partial class MainForm
 
     private void DeleteCurrentAnimationFrame()
     {
-        RecordFrameStructure();
+        RecordStructure();
         foreach (var layer in _layers) layer.History.Clear();
         _frames.RemoveAt(_activeFrame);
         int next = Math.Min(_activeFrame, _frames.Count - 1);
@@ -224,7 +239,7 @@ public sealed partial class MainForm
         var frame = AnimationFrame.FromImage(source, _grid.Width, _grid.Height);
         SyncCurrentFrame();
         frame.Layers[0].SetHistoryBudget(_historyBudget);
-        RecordFrameStructure();
+        RecordStructure();
         int next = _activeFrame + 1; _frames.Insert(next, frame);
         SwitchFrame(next); SetDirty();
     }
@@ -238,6 +253,17 @@ public sealed partial class MainForm
         if (_timeline is not null) _timeline.Enabled = !_playing;
         UpdateOnionSkin();
         _canvas.Editable = !_playing && _layers[_activeLayer].Visible;
-        if (_playing) _animationTimer.Start(); else _animationTimer.Stop();
+        if (_playing)
+        {
+            _playStartFrame = _activeFrame;
+            _playClock.Restart();
+            _animationTimer.Interval = AnimationClock.PollIntervalMs(_fps);
+            _animationTimer.Start();
+        }
+        else
+        {
+            _animationTimer.Stop();
+            _playClock.Reset();
+        }
     }
 }

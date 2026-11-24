@@ -277,7 +277,7 @@ public sealed partial class MainForm
         }
         foreach (var frame in staged) foreach (var layer in frame.Layers) layer.SetHistoryBudget(_historyBudget);
         SyncCurrentFrame();
-        RecordFrameStructure();
+        RecordStructure();
         int start = _frames.Count; _frames.AddRange(staged);
         SwitchFrame(_frames.Count - 1);
         if (_fps != fps) _fpsControl.Value = fps;
@@ -371,8 +371,10 @@ public sealed partial class MainForm
 
     private object ManageLayerFromMcp(JsonObject args, string action)
     {
+        var before = CaptureStructure();
         var (active, changed) = McpCanvas.ManageLayer(args, _layers, _activeLayer, action);
         _activeLayer = active;
+        if (changed) CommitStructure(before);
         if (changed) { RefreshLayerList(); ActivateLayer(); SetDirty(); }
         return new { ok = true, data = new { changed, canvas = McpCanvas.Info(_layers, _activeLayer, _frames.Count, _activeFrame, _fps, _playing) } };
     }

@@ -643,6 +643,7 @@ public sealed partial class MainForm : Form
         if (_frames.Count > 1 && _frames.Sum(f => (long)f.Layers.Count * _grid.Width * _grid.Height) + (long)_grid.Width * _grid.Height > ProjectFile.MaxAnimationPixels) { MessageBox.Show(this, "动画帧总像素已达上限。", "图层"); return; }
         int number = 1;
         while (_layers.Any(l => l.Name == $"图层 {number}")) number++;
+        RecordStructure();
         var layer = new Layer($"图层 {number}", new PixelGrid(_grid.Width, _grid.Height));
         layer.SetHistoryBudget(_historyBudget);
         _layers.Insert(++_activeLayer, layer);
@@ -652,8 +653,8 @@ public sealed partial class MainForm : Form
     private void DeleteLayer()
     {
         if (_layers.Count == 1) { MessageBox.Show(this, "至少保留一个图层。"); return; }
-        if (MessageBox.Show(this, $"确定删除“{_layers[_activeLayer].Name}”？删除后无法撤销。", "删除图层", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
-        _layers[_activeLayer].History.Clear();
+        if (MessageBox.Show(this, $"确定删除“{_layers[_activeLayer].Name}”？可用 Ctrl+Z 撤销。", "删除图层", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
+        RecordStructure();
         _layers.RemoveAt(_activeLayer);
         _activeLayer = Math.Min(_activeLayer, _layers.Count - 1);
         RefreshLayerList(); ActivateLayer(); SetDirty();
@@ -661,6 +662,7 @@ public sealed partial class MainForm : Form
 
     private void ToggleLayerVisibility()
     {
+        RecordStructure();
         var layer = _layers[_activeLayer];
         layer.Visible = !layer.Visible;
         RefreshLayerList(); ActivateLayer(); SetDirty();
@@ -670,6 +672,7 @@ public sealed partial class MainForm : Form
     {
         int target = _activeLayer + delta;
         if (target < 0 || target >= _layers.Count) return;
+        RecordStructure();
         (_layers[_activeLayer], _layers[target]) = (_layers[target], _layers[_activeLayer]);
         _activeLayer = target;
         RefreshLayerList(); ActivateLayer(); SetDirty();
@@ -853,7 +856,7 @@ public sealed partial class MainForm : Form
         _grid = new PixelGrid(w, h);
         _layers = new List<Layer> { new("图层 1", _grid) };
         _frames = new List<AnimationFrame> { new(_layers) }; _activeFrame = 0;
-        _frameUndo.Clear();
+        _structureUndo.Clear();
         _historyBudget = new HistoryBudget();
         _layers[0].SetHistoryBudget(_historyBudget);
         _activeLayer = 0;
@@ -936,7 +939,7 @@ public sealed partial class MainForm : Form
     private void DoRedo() => StepHistory(redo: true);
 
     /// <summary>
-    /// 撤销或重做一步：图层像素历史与帧结构快照按动作序号竞争——撤销取序号更大者，重做取更小者。
+    /// 撤销或重做一步：图层像素历史与文档结构快照（帧 + 图层）按动作序号竞争——撤销取序号更大者，重做取更小者。
     /// 像素历史跨所有帧的所有图层扫描，因此可能落在非当前帧；命中时自动切到该帧图层再撤销。
     /// </summary>
     private bool StepHistory(bool redo)
@@ -944,15 +947,15 @@ public sealed partial class MainForm : Form
         if (_playing || _canvas.InteractionInProgress) return false;
         SyncCurrentFrame();
         var best = BestPixelHistory(redo);
-        bool frame = redo ? _frameUndo.CanRedo : _frameUndo.CanUndo;
-        if (best is null && !frame) return false;
+        bool structure = redo ? _structureUndo.CanRedo : _structureUndo.CanUndo;
+        if (best is null && !structure) return false;
         long pixelSeq = best?.Item3 ?? (redo ? long.MaxValue : long.MinValue);
-        bool frameFirst = frame && (best is null ||
-            (redo ? _frameUndo.RedoSeq < pixelSeq : _frameUndo.UndoSeq > pixelSeq));
-        if (frameFirst)
+        bool structureFirst = structure && (best is null ||
+            (redo ? _structureUndo.RedoSeq < pixelSeq : _structureUndo.UndoSeq > pixelSeq));
+        if (structureFirst)
         {
-            var current = CaptureFrames();
-            RestoreFrameSnapshot(redo ? _frameUndo.Redo(current) : _frameUndo.Undo(current));
+            var current = CaptureStructure();
+            RestoreStructureSnapshot(redo ? _structureUndo.Redo(current) : _structureUndo.Undo(current));
         }
         else
         {
@@ -989,8 +992,8 @@ public sealed partial class MainForm : Form
 
     private void UpdateUndoButtons()
     {
-        _undoButton.Enabled = _history.CanUndo || _frameUndo.CanUndo;
-        _redoButton.Enabled = _history.CanRedo || _frameUndo.CanRedo;
+        _undoButton.Enabled = _history.CanUndo || _structureUndo.CanUndo;
+        _redoButton.Enabled = _history.CanRedo || _structureUndo.CanRedo;
     }
 
     private void ClearCanvas()
@@ -1146,12 +1149,12 @@ public sealed partial class MainForm : Form
         _frames = result.Frames;
         _activeFrame = result.ActiveFrame;
         _fps = result.FramesPerSecond;
-        _animationTimer.Interval = Math.Max(1, 1000 / _fps);
+        _animationTimer.Interval = AnimationClock.PollIntervalMs(_fps);
         _grid = result.Grid;
         _layers = result.Layers;
         _historyBudget = new HistoryBudget();
         foreach (var frame in _frames) foreach (var layer in frame.Layers) layer.SetHistoryBudget(_historyBudget);
-        _frameUndo.Clear();
+        _structureUndo.Clear();
         _activeLayer = result.ActiveLayer;
         _palette = result.Palette;
         _canvas.Layers = _layers;
@@ -1510,11 +1513,11 @@ public sealed partial class MainForm : Form
                     // 先写入当前会话的副本，确认成功后才移除旧副本。
                     ProjectFile.Save(RecoveryPath, result.Layers, result.ActiveLayer, result.Palette, frames: result.Frames, activeFrame: result.ActiveFrame, framesPerSecond: result.FramesPerSecond);
                     _frames = result.Frames; _activeFrame = result.ActiveFrame; _fps = result.FramesPerSecond;
-                    _animationTimer.Interval = Math.Max(1, 1000 / _fps);
+                    _animationTimer.Interval = AnimationClock.PollIntervalMs(_fps);
                     _layers = result.Layers;
                     _historyBudget = new HistoryBudget();
                     foreach (var frame in _frames) foreach (var layer in frame.Layers) layer.SetHistoryBudget(_historyBudget);
-                    _frameUndo.Clear();
+                    _structureUndo.Clear();
                     _activeLayer = result.ActiveLayer;
                     _grid = result.Grid;
                     _palette = result.Palette;

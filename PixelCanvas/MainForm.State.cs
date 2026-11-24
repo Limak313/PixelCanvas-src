@@ -36,4 +36,6 @@ public sealed partial class MainForm
     private int _activeFrame;
     private int _fps = 8;
     private bool _updatingFrames, _playing;
+    private readonly System.Diagnostics.Stopwatch _playClock = new();
+    private int _playStartFrame;
 }

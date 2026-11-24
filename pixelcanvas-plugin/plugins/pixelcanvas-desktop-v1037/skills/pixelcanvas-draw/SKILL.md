@@ -22,7 +22,7 @@ description: 在 PixelCanvas Desktop 中通过本地 MCP 直接创建、读取�
    矩形区域复制或移动使用 `canvas_copy_region` 或 `canvas_move_region`，源和目标均需完整位于画布中；透明像素不会覆盖目标。移动会清除源区域。
    操作软件界面上的选区和内部复制缓存时，使用 `canvas_selection_get`、`canvas_selection_set`、`canvas_selection_copy`、`canvas_selection_paste`；粘贴位置遵循软件界面行为。需要切换界面当前图层时使用 `canvas_select_layer`。仅在用户明确要求清空图层时使用 `canvas_clear_layer` 并传 `confirm=true`，可撤销；仅在用户明确要求重置画布尺寸、知悉会清空所有帧和历史时使用 `canvas_resize` 并传 `confirm=true`，不要用它替代创建新画布。
    用户要求改变界面绘画设置时可用 `canvas_draw_options_get` / `canvas_draw_options_set`，控制工具、画笔、颜色和界面镜像；MCP 实际绘画仍需单独传镜像参数。用户要求调整视图时可用 `canvas_view_get` / `canvas_view_set` 控制缩放、适应、滚动、画布位置、网格、沉浸模式和侧栏。沉浸模式下设置侧栏须先退出沉浸。
-   使用 `canvas_move_layer` 和 `canvas_set_layer_visibility` 调整图层；索引从底层 0 开始。仅在用户明确要求删除特定图层时调用 `canvas_delete_layer` 并传入 confirm=true，删除不可撤销，至少保留一个图层。
+   使用 `canvas_move_layer` 和 `canvas_set_layer_visibility` 调整图层；索引从底层 0 开始。仅在用户明确要求删除特定图层时调用 `canvas_delete_layer` 并传入 confirm=true，删除会丢掉该层像素但可用 `canvas_undo` 撤销，至少保留一个图层；调整顺序与显隐同样可撤销。
 4. 先检查绘画工具返回是否成功；需要判断整体效果时用 `canvas_preview` 获取当前帧的可见图层合成 PNG，预览不包含参考图或网格；要读取指定坐标的可见图层合成颜色使用 `canvas_pick_composite_color`，要读取单一图层则使用 `canvas_read_pixels`。简单操作且结果明确时可省略读取；用户要求核验、操作失败或返回状态不确定时应检查相关区域并如实报告，无法核实就说明。简要告知用户作品在哪个画布、是否分层以及各层用途。只有用户要求保存或导出时才使用保存或导出工具。
 
 用户要求打开已有工程时，使用 `canvas_open_project`；窗口有未保存修改时先保存或另开窗口，不丢弃修改。用户要求保存当前工程时使用 `canvas_save_project`：未命名画布未指定路径时自动保存到默认产出文件夹，已有路径的工程会更新原文件；用户要求保留原件时使用 `canvas_save_copy`。
