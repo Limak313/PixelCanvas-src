@@ -7,7 +7,9 @@ namespace PixelCanvas.Tests;
 
 /// <summary>
 /// UI 冒烟测试共享辅助：在 STA 线程内创建 WinForms 窗体与控件，并通过反射访问 MainForm 私有成员。
-/// 这些用例依赖交互式桌面会话，不在无头或 CI 环境运行；手动启用时移除对应 fact 的 Skip。
+/// 用例所在类标记 [Trait("Category", "UI")]，不进无头 CI 门禁；需要在交互式桌面会话里手动执行：
+/// dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Category=UI"
+/// 或 .\构建与测试.ps1 -Ui。
 /// </summary>
 internal static class UiTestSupport
 {

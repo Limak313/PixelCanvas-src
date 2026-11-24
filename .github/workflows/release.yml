@@ -3,6 +3,7 @@ name: Release
 # 发布打包：打 tag（v*）或手动触发时，Windows 环境先过构建+无头测试门禁，
 # 再产出自包含部署包 zip 与插件包 zip，并创建 GitHub Release 上传资产。
 # 三个项目目标框架均为 net10.0-windows 且启用 WinForms，必须使用 Windows runner。
+# 门禁排除 [Trait("Category","UI")] 的交互式冒烟用例（依赖桌面会话，在本机用 -Ui 手动执行）。
 
 on:
   push:
@@ -31,7 +32,7 @@ jobs:
       - name: Release build & headless tests (gate)
         run: |
           dotnet build PixelCanvas.slnx -c Release --nologo
-          dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --no-build --nologo
+          dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --no-build --nologo --filter "Category!=UI"
 
       - name: Package self-contained deployment zip
         shell: pwsh

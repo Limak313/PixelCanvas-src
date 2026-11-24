@@ -12,8 +12,11 @@ namespace PixelCanvas.Tests;
 /// 交互式 WinForms 冒烟测试：在 STA 线程内创建窗体与控件，通过反射覆盖帧切换、独立撤销历史、
 /// 播放定时器、批量绘画、组合工具、批量帧、洋葱皮、时间轴拖放、调色板与预设、双轴镜像、
 /// 图层合成、参考图、填充/渐变镜像、选区、图层、视图与尺寸调整等界面路径。
-/// 这些用例依赖交互式桌面会话，默认跳过；本地启用时移除对应 fact 的 Skip。
+/// 除参考图一组外多数用例会创建 MainForm 句柄，依赖交互式桌面会话与真实 DPI 环境，故整类标记
+/// [Trait("Category", "UI")]：核心测试用 --filter "Category!=UI" 排除，手动跑用
+/// --filter "Category=UI"（或 .\构建与测试.ps1 -Ui）。
 /// </summary>
+[Trait("Category", "UI")]
 public class UiSmokeTests
 {
     private const BindingFlags Flags = UiTestSupport.InstanceNonPublic;
@@ -22,7 +25,7 @@ public class UiSmokeTests
 
     private static JsonNode Data(JsonNode node) => node["data"]!;
 
-    [Fact(Skip = "需要交互式桌面 STA 会话，不在无头或 CI 环境运行")]
+    [Fact]
     public void ReferenceControl_LoadsAndClearsSourcePath()
     {
         UiTestSupport.RunInSta(() =>
@@ -38,7 +41,7 @@ public class UiSmokeTests
         });
     }
 
-    [Fact(Skip = "需要交互式桌面 STA 会话，不在无头或 CI 环境运行")]
+    [Fact]
     public void FrameHistory_SwitchFrameUndoAndPlayback()
     {
         UiTestSupport.RunInSta(() =>
@@ -71,7 +74,7 @@ public class UiSmokeTests
         });
     }
 
-    [Fact(Skip = "需要交互式桌面 STA 会话，不在无头或 CI 环境运行")]
+    [Fact]
     public void BatchPaint_RollsBackOnInvalid_AndSaveExportReportsPartial()
     {
         using var dir = new TempDir();
@@ -130,7 +133,7 @@ public class UiSmokeTests
         });
     }
 
-    [Fact(Skip = "需要交互式桌面 STA 会话，不在无头或 CI 环境运行")]
+    [Fact]
     public void CreateArtwork_SavesLayers_ReuseAndFailureStage()
     {
         using var dir = new TempDir();
@@ -182,7 +185,7 @@ public class UiSmokeTests
         });
     }
 
-    [Fact(Skip = "需要交互式桌面 STA 会话，不在无头或 CI 环境运行")]
+    [Fact]
     public void AnimationFrames_OnionSkin_ReorderAndTimelineDrag()
     {
         using var dir = new TempDir();
@@ -277,7 +280,7 @@ public class UiSmokeTests
         });
     }
 
-    [Fact(Skip = "需要交互式桌面 STA 会话，不在无头或 CI 环境运行")]
+    [Fact]
     public void Palette_ReplaceSaveLoad_AndPresetLifecycle()
     {
         using var dir = new TempDir();
@@ -345,7 +348,7 @@ public class UiSmokeTests
         });
     }
 
-    [Fact(Skip = "需要交互式桌面 STA 会话，不在无头或 CI 环境运行")]
+    [Fact]
     public void Mirror_LayerComposite_AndReferenceImage()
     {
         using var dir = new TempDir();
@@ -394,7 +397,7 @@ public class UiSmokeTests
         });
     }
 
-    [Fact(Skip = "需要交互式桌面 STA 会话，不在无头或 CI 环境运行")]
+    [Fact]
     public void FillAndGradient_MirrorDirection()
     {
         UiTestSupport.RunInSta(() =>
@@ -414,7 +417,7 @@ public class UiSmokeTests
         });
     }
 
-    [Fact(Skip = "需要交互式桌面 STA 会话，不在无头或 CI 环境运行")]
+    [Fact]
     public void Selection_Layer_View_AndResize()
     {
         using var dir = new TempDir();

@@ -30,10 +30,16 @@
 
 需要 .NET 10 SDK（可在 [dotnet.microsoft.com](https://dotnet.microsoft.com) 下载，或 `winget install Microsoft.DotNet.SDK.10`）。版本号由根目录 `Directory.Build.props` 集中管理，桌面程序、MCP 服务与插件清单对齐。
 
-一键 Release 全量构建并运行核心测试（不含 `--ui` 交互分支）：
+一键 Release 全量构建并运行核心测试（默认排除交互式 UI 冒烟组）：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\构建与测试.ps1
+```
+
+连交互式 UI 冒烟组一起跑（需要已登录的桌面会话）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\构建与测试.ps1 -Ui
 ```
 
 或手动分步执行：
@@ -42,11 +48,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\构建与测试.ps1
 # 全量构建解决方案（PixelCanvas / PixelCanvas.Mcp / PixelCanvas.Tests）
 dotnet build PixelCanvas.slnx -c Release
 
-# 运行 xUnit 核心测试（交互 UI 冒烟用例默认跳过）
-dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release
+# 运行无头核心测试（排除 UI 组）
+dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Category!=UI"
+
+# 运行交互式 UI 冒烟组（需桌面会话；150% 缩放下才能复现高 DPI 路径）
+dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Category=UI"
 ```
 
-测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、绘画算法、调色板为无头可运行的核心用例；`UiSmokeTests` 标记为跳过，需交互式桌面 STA 会话手动验证。
+测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、绘画算法、调色板为无头可运行的核心用例（60 条）；`UiSmokeTests` 的 9 条界面路径用例标记 `Category=UI`，依赖交互式桌面会话与真实 DPI 环境，CI 门禁按标签排除，在本机用上面的 `-Ui` 方式执行。
 
 ## 发布打包
 

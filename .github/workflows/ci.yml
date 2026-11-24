@@ -2,7 +2,7 @@ name: CI
 
 # 持续集成门禁：Windows 环境 Release 全量构建 + 无头核心测试。
 # 三个项目目标框架均为 net10.0-windows 且启用 WinForms，必须使用 Windows runner。
-# 9 组 UI 冒烟用例默认带 [Fact(Skip=...)]，不在无头或 CI 环境运行。
+# UI 冒烟用例标记 [Trait("Category","UI")]，依赖交互式桌面，门禁中用 --filter "Category!=UI" 排除。
 
 on:
   push:
@@ -30,10 +30,11 @@ jobs:
       - name: Restore & Release build solution
         run: dotnet build PixelCanvas.slnx -c Release --nologo
 
-      - name: Run headless tests (UI smoke cases are skipped)
+      - name: Run headless tests (UI group excluded)
         run: >-
           dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj
           -c Release --no-build --nologo
+          --filter "Category!=UI"
           --logger "trx;LogFileName=pixelcanvas-tests.trx"
 
       - name: Upload test results
