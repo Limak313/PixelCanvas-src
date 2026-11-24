@@ -2,7 +2,7 @@
 
 本项目遵循语义化版本；版本号由根目录 `Directory.Build.props` 集中管理，桌面程序、MCP 服务与插件清单对齐同一版本。
 
-## [未发布]
+## [1.0.40] - 2026-11-24
 
 ### 变更
 - 架构拆分：新增 `PixelCanvas.Core`（`net10.0`），迁入像素模型、工程读写、撤销历史、GIF/SVG/PNG/精灵表/序列帧导出、预设、路径与 MCP 画布模型共 24 个文件；`PixelCanvas.Mcp` 同步改为 `net10.0`，只引用 Core，不再依赖 WinForms。Windows 桌面界面保持原样。

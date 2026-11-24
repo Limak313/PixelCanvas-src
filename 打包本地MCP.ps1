@@ -31,11 +31,13 @@ function Format-Size([long]$bytes) { '{0:N1} MB' -f ($bytes / 1MB) }
 $appProject = Join-Path $projectRoot 'PixelCanvas\PixelCanvas.csproj'
 $serverProject = Join-Path $projectRoot 'PixelCanvas.Mcp\PixelCanvas.Mcp.csproj'
 $appFiles = @('PixelCanvas.exe', 'PixelCanvas.dll', 'PixelCanvas.deps.json', 'PixelCanvas.runtimeconfig.json')
-$serverFiles = @('PixelCanvas.Mcp.exe', 'PixelCanvas.Mcp.dll', 'PixelCanvas.Mcp.deps.json', 'PixelCanvas.Mcp.runtimeconfig.json', 'PixelCanvas.exe', 'PixelCanvas.dll', 'PixelCanvas.deps.json', 'PixelCanvas.runtimeconfig.json')
+$serverFiles = @('PixelCanvas.Mcp.exe', 'PixelCanvas.Mcp.dll', 'PixelCanvas.Mcp.deps.json', 'PixelCanvas.Mcp.runtimeconfig.json', 'PixelCanvas.Core.dll', 'PixelCanvas.exe', 'PixelCanvas.dll', 'PixelCanvas.deps.json', 'PixelCanvas.runtimeconfig.json')
 
 # 插件里的 app/server 始终是「多文件框架依赖」构建产物，与部署包模式无关
 $pluginBuildRoot = Join-Path $projectRoot '.plugin-build'
 if (-not $NoPlugin) {
+    dotnet build $appProject -c Release --artifacts-path $pluginBuildRoot --no-incremental
+    if ($LASTEXITCODE -ne 0) { throw '构建失败。' }
     dotnet build $serverProject -c Release --artifacts-path $pluginBuildRoot --no-incremental
     if ($LASTEXITCODE -ne 0) { throw '构建失败。' }
     $short = 'v' + ($version -replace '\.', '')
@@ -45,6 +47,7 @@ if (-not $NoPlugin) {
     $pluginServer = Join-Path $pluginDir 'server'
     New-Item -ItemType Directory -Path $pluginApp, $pluginServer -Force | Out-Null
     foreach ($name in $appFiles) { Copy-Item -LiteralPath (Join-Path $pluginBuildRoot "bin\PixelCanvas\release\$name") -Destination $pluginApp -Force }
+    Copy-Item -LiteralPath (Join-Path $pluginBuildRoot "bin\PixelCanvas\release\PixelCanvas.Core.dll") -Destination $pluginApp -Force
     Copy-Item -LiteralPath (Join-Path $projectRoot 'PixelCanvas\Assets\pixelcanvas.ico') -Destination $pluginApp -Force
     foreach ($name in $serverFiles) {
         $src = Join-Path $pluginBuildRoot "bin\PixelCanvas.Mcp\release\$name"
@@ -91,6 +94,8 @@ function New-BundlePackage([string]$base) {
     $zipPath = Join-Path $projectRoot "$base.zip"
     foreach ($path in @($packageRoot, $zipPath, $buildRoot)) { if (Test-Path -LiteralPath $path) { throw "目标已存在，请选择其他 PackageName：$path" } }
 
+    dotnet build $appProject -c Release --artifacts-path $buildRoot --no-incremental
+    if ($LASTEXITCODE -ne 0) { throw '构建失败。' }
     dotnet build $serverProject -c Release --artifacts-path $buildRoot --no-incremental
     if ($LASTEXITCODE -ne 0) { throw '构建失败。' }
     $appOut = Join-Path $buildRoot 'bin\PixelCanvas\release'
@@ -106,8 +111,11 @@ function New-BundlePackage([string]$base) {
     if (!(Test-Path -LiteralPath (Join-Path $dotnetRoot "host\fxr\$rtVersion\hostfxr.dll"))) { throw "找不到匹配的 hostfxr：$rtVersion" }
     foreach ($dir in @('app', 'server', 'runtime\host\fxr', 'runtime\shared\Microsoft.NETCore.App', 'runtime\shared\Microsoft.WindowsDesktop.App')) { New-Item -ItemType Directory -Path (Join-Path $packageRoot $dir) -Force | Out-Null }
     foreach ($name in $appFiles) { Copy-Item -LiteralPath (Join-Path $appOut $name) -Destination (Join-Path $packageRoot 'app') }
+    Copy-Item -LiteralPath (Join-Path $appOut 'PixelCanvas.Core.dll') -Destination (Join-Path $packageRoot 'app')
     Copy-Item -LiteralPath (Join-Path $projectRoot 'PixelCanvas\Assets\pixelcanvas.ico') -Destination (Join-Path $packageRoot 'app') -Force
-    foreach ($name in @('PixelCanvas.Mcp.exe', 'PixelCanvas.Mcp.dll', 'PixelCanvas.Mcp.deps.json', 'PixelCanvas.Mcp.runtimeconfig.json', 'PixelCanvas.dll')) { Copy-Item -LiteralPath (Join-Path $serverOut $name) -Destination (Join-Path $packageRoot 'server') }
+    foreach ($name in @('PixelCanvas.Mcp.exe', 'PixelCanvas.Mcp.dll', 'PixelCanvas.Mcp.deps.json', 'PixelCanvas.Mcp.runtimeconfig.json')) { Copy-Item -LiteralPath (Join-Path $serverOut $name) -Destination (Join-Path $packageRoot 'server') }
+    foreach ($name in $appFiles) { Copy-Item -LiteralPath (Join-Path $appOut $name) -Destination (Join-Path $packageRoot 'server') }
+    Copy-Item -LiteralPath (Join-Path $serverOut 'PixelCanvas.Core.dll') -Destination (Join-Path $packageRoot 'server')
     Copy-Item -LiteralPath (Join-Path $dotnetRoot 'dotnet.exe'), (Join-Path $dotnetRoot 'LICENSE.txt'), (Join-Path $dotnetRoot 'ThirdPartyNotices.txt') -Destination (Join-Path $packageRoot 'runtime')
     Copy-Item -LiteralPath (Join-Path $dotnetRoot "host\fxr\$rtVersion") -Destination (Join-Path $packageRoot 'runtime\host\fxr') -Recurse
     Copy-Item -LiteralPath (Join-Path $coreRoot $rtVersion) -Destination (Join-Path $packageRoot 'runtime\shared\Microsoft.NETCore.App') -Recurse

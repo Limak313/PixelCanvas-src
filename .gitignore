@@ -6,8 +6,10 @@ publish-*/
 *-check/
 
 # 部署包与压缩归档（由打包脚本生成，不入库）
-PixelCanvas-Agent-*/
-PixelCanvas-*/
+/PixelCanvas-Agent-*/
+/PixelCanvas-*/
+!/pixelcanvas-plugin/
+/pixelcanvas-plugin-*.zip
 *-build/
 .plugin-build/
 *.zip
