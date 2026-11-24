@@ -441,8 +441,20 @@ public sealed partial class MainForm
     {
         string path = McpCanvas.NewPath(args, "path", ".gif", animation: true);
         SyncCurrentFrame();
-        GifExport.Save(path, _frames, _fps, McpCanvas.Number(args, "scale", 1));
-        return new { ok = true, data = new { path, frameCount = _frames.Count, fps = _fps, loop = true } };
+        var palette = GifPaletteFromMcp(args, _palette);
+        GifExport.Save(path, _frames, _fps, McpCanvas.Number(args, "scale", 1), palette: palette);
+        return new { ok = true, data = new { path, frameCount = _frames.Count, fps = _fps, loop = true, palette = palette is null ? "auto" : "custom", paletteColors = palette?.Length ?? 0 } };
+    }
+
+    /// <summary>解析 GIF 索引色：显式 palette 数组优先，其次 use_project_palette，否则自动。</summary>
+    private static int[]? GifPaletteFromMcp(JsonObject args, IReadOnlyList<string> projectPalette)
+    {
+        bool useProject = args["use_project_palette"]?.GetValue<bool>() == true;
+        if (useProject && args["palette"] is not null) throw new ArgumentException("palette 与 use_project_palette 不能同时使用。");
+        if (args["palette"] is JsonNode node) return PaletteFile.Validate(node).Select(PaletteFile.ToArgb).ToArray();
+        if (!useProject) return null;
+        if (projectPalette.Count is < 1 or > 255) throw new ArgumentException($"当前工程调色板有 {projectPalette.Count} 色；GIF 索引色最多 255 色，请先精简调色板。");
+        return projectPalette.Select(PaletteFile.ToArgb).ToArray();
     }
 
     private object ExportSpriteSheetFromMcp(JsonObject args)

@@ -20,6 +20,15 @@ internal static class PaletteFile
         return colors;
     }
 
+    /// <summary>把已验证的 #RRGGBB 颜色转为不透明 ARGB。</summary>
+    internal static int ToArgb(string hex)
+    {
+        string value = hex.StartsWith('#') ? hex[1..] : hex;
+        if (value.Length != 6 || !int.TryParse(value, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out int rgb))
+            throw new ArgumentException("调色板颜色必须为 #RRGGBB。");
+        return unchecked((int)0xFF000000) | rgb;
+    }
+
     internal static List<string> Load(string path)
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);

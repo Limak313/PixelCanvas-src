@@ -190,6 +190,75 @@ public class ExportTests
     }
 
     [Fact]
+    public void Gif_FixedPalette_WritesIndexedTableAndMapsNearest()
+    {
+        using var dir = new TempDir();
+        var grid = new PixelGrid(3, 1);
+        grid.Set(0, 0, Argb.FromRgb(0x112233));
+        grid.Set(1, 0, Argb.FromRgb(0x00FF00));
+        grid.Set(2, 0, Argb.FromRgb(0x999999));
+        var frames = new List<AnimationFrame> { new(new List<Layer> { new("art", grid) }) };
+        var path = dir.File("indexed.gif");
+
+        GifExport.Save(path, frames, 8, 1, palette: new[] { unchecked((int)0xFF112233), unchecked((int)0xFF00FF00) });
+
+        var bytes = File.ReadAllBytes(path);
+        Assert.Equal(0x11, bytes[16]);
+        Assert.Equal(0x22, bytes[17]);
+        Assert.Equal(0x33, bytes[18]);
+        Assert.Equal(0x00, bytes[19]);
+        Assert.Equal(0xFF, bytes[20]);
+        Assert.Equal(0x00, bytes[21]);
+
+        using var gif = new Bitmap(path);
+        Assert.Equal(0x112233, gif.GetPixel(0, 0).ToArgb() & 0xFFFFFF);
+        Assert.Equal(0x00FF00, gif.GetPixel(1, 0).ToArgb() & 0xFFFFFF);
+        Assert.Equal(0x112233, gif.GetPixel(2, 0).ToArgb() & 0xFFFFFF);
+    }
+
+    [Fact]
+    public void Gif_FixedPalette_RejectsInvalidColors()
+    {
+        using var dir = new TempDir();
+        var grid = new PixelGrid(1, 1);
+        grid.Set(0, 0, Argb.FromRgb(0x123456));
+        var frames = new List<AnimationFrame> { new(new List<Layer> { new("art", grid) }) };
+
+        Assert.Throws<ArgumentException>(() => GifExport.Save(dir.File("empty.gif"), frames, 8, 1, palette: Array.Empty<int>()));
+        Assert.Throws<ArgumentException>(() => GifExport.Save(dir.File("alpha.gif"), frames, 8, 1, palette: new[] { 0x00123456 }));
+        var tooMany = Enumerable.Range(0, 256).Select(i => unchecked((int)(0xFF000000u | ((uint)i << 8) | (uint)i))).ToArray();
+        Assert.Throws<ArgumentException>(() => GifExport.Save(dir.File("many.gif"), frames, 8, 1, palette: tooMany));
+        Assert.False(File.Exists(dir.File("empty.gif")));
+        Assert.False(File.Exists(dir.File("alpha.gif")));
+        Assert.False(File.Exists(dir.File("many.gif")));
+    }
+
+    [Fact]
+    public async Task ProjectExportGif_UsesProjectPalette()
+    {
+        using var dir = new TempDir();
+        var previous = Environment.GetEnvironmentVariable("PIXELCANVAS_OUTPUT_DIR");
+        Environment.SetEnvironmentVariable("PIXELCANVAS_OUTPUT_DIR", dir.Path);
+        try
+        {
+            var first = new PixelGrid(2, 1);
+            first.Set(0, 0, Argb.FromRgb(0x112233));
+            first.Set(1, 0, Argb.FromRgb(0x00FF00));
+            var project = dir.File("indexed.pxproj");
+            ProjectFile.Save(project, new[] { new Layer("art", first) }, 0, new[] { "112233", "00FF00" },
+                frames: new List<AnimationFrame> { new(new List<Layer> { new("art", first) }) }, framesPerSecond: 8);
+
+            var result = await McpTestHost.ProjectActionAsync("project_export_gif", new { path = project, use_project_palette = true });
+
+            Assert.Equal("custom", result["palette"]!.GetValue<string>());
+            Assert.Equal(2, result["paletteColors"]!.GetValue<int>());
+            var bytes = File.ReadAllBytes(result["path"]!.GetValue<string>());
+            Assert.Equal(new byte[] { 0x11, 0x22, 0x33, 0x00, 0xFF, 0x00 }, bytes[16..22]);
+        }
+        finally { Environment.SetEnvironmentVariable("PIXELCANVAS_OUTPUT_DIR", previous); }
+    }
+
+    [Fact]
     public void Gif_QuantizesOver255Colors()
     {
         using var dir = new TempDir();

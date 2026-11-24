@@ -218,7 +218,7 @@ public static class McpBridge
         new { name = "canvas_save_project", description = "保存当前工程；未命名画布省略路径时保存到默认产出目录，已有路径的工程将更新原文件。", inputSchema = Schema("{\"type\":\"object\",\"properties\":{\"process_id\":{\"type\":\"integer\"},\"path\":{\"type\":\"string\",\"description\":\"未命名画布的全新 .pxproj 文件绝对路径\"}},\"additionalProperties\":false}") },
         new { name = "canvas_save_and_export", description = "保存当前工程并将当前帧导出到新 PNG；请检查返回的 pngExported，导出失败时工程可能已保存。", inputSchema = Schema("{\"type\":\"object\",\"properties\":{\"process_id\":{\"type\":\"integer\"},\"project_path\":{\"type\":\"string\",\"description\":\"未命名工程的新 .pxproj 绝对路径\"},\"png_path\":{\"type\":\"string\",\"description\":\"不存在的 PNG 绝对路径\"},\"scale\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":16}},\"additionalProperties\":false}") },
         new { name = "canvas_export_png", description = "将运行中的画布导出到新的 PNG 文件。", inputSchema = CanvasOutputSchema },
-        new { name = "canvas_export_gif", description = "将当前画布全部帧导出为循环 GIF；默认保存到动画文件夹。", inputSchema = CanvasOutputSchema },
+        new { name = "canvas_export_gif", description = "将当前画布全部帧导出为循环 GIF；可用 palette 指定固定索引色或 use_project_palette 复用工程调色板，省略时自动量化。", inputSchema = CanvasGifSchema() },
         new { name = "canvas_export_sprite_sheet", description = "将当前画布全部帧按从左到右、从上到下排列为透明 PNG 精灵表；返回布局信息。", inputSchema = SpriteSheetSchema(false) },
         new { name = "canvas_export_svg", description = "将当前帧的可见图层导出为 SVG 矢量色块（相邻同色像素合并为矩形，透明留空），不随缩放失真。", inputSchema = SvgExportSchema },
         new { name = "canvas_export_frame_sequence", description = "将全部帧按顺序导出为 PNG 序列（frame-001.png…）到一个新的空目录；用于游戏引擎逐帧素材。", inputSchema = FrameSequenceSchema() },
@@ -240,7 +240,7 @@ public static class McpBridge
         new { name = "project_move_layer", description = "调整图层顺序并另存。", inputSchema = FileOutputSchema(MoveLayerSchema) },
         new { name = "project_set_layer_visibility", description = "设置图层显隐并另存。", inputSchema = FileOutputSchema(LayerVisibilitySchema) },
         new { name = "project_export_png", description = "导出工程可见图层到新的 PNG 文件。", inputSchema = FileExportSchema() },
-        new { name = "project_export_gif", description = "将工程全部帧导出为循环 GIF；默认保存到动画文件夹。", inputSchema = GifExportSchema() },
+        new { name = "project_export_gif", description = "将工程全部帧导出为循环 GIF；可用 palette 指定固定索引色或 use_project_palette 复用工程调色板，省略时自动量化。", inputSchema = GifExportSchema() },
         new { name = "project_export_sprite_sheet", description = "将工程全部帧导出为透明 PNG 精灵表；返回布局信息。", inputSchema = SpriteSheetSchema(true) },
     }
     };
@@ -320,7 +320,33 @@ public static class McpBridge
     {
         var schema = FileExportSchema();
         schema["properties"]!["output_path"]!["description"] = "不存在的 .gif 绝对路径；省略时使用动画文件夹";
+        AddGifPaletteSchema(schema);
         return schema;
+    }
+
+    private static JsonObject CanvasGifSchema()
+    {
+        var schema = (JsonObject)CanvasOutputSchema.DeepClone();
+        schema["properties"]!["path"]!["description"] = "不存在的 .gif 绝对路径；省略时使用动画文件夹";
+        AddGifPaletteSchema(schema);
+        return schema;
+    }
+
+    private static void AddGifPaletteSchema(JsonObject schema)
+    {
+        schema["properties"]!["palette"] = new JsonObject
+        {
+            ["type"] = "array",
+            ["minItems"] = 1,
+            ["maxItems"] = 255,
+            ["items"] = new JsonObject { ["type"] = "string", ["description"] = "#RRGGBB" },
+            ["description"] = "固定索引色，按顺序写入 GIF 全局色表；透明固定为索引 0，画面外的颜色映射到最近色"
+        };
+        schema["properties"]!["use_project_palette"] = new JsonObject
+        {
+            ["type"] = "boolean",
+            ["description"] = "使用工程调色板作为 GIF 固定索引色；与 palette 不能同时使用"
+        };
     }
 
     internal static async Task<object> CallToolAsync(JsonObject request)
@@ -492,8 +518,19 @@ public static class McpBridge
     private static object ExportGifFile(JsonObject args, ProjectFile.LoadResult project)
     {
         string output = McpCanvas.NewPath(args, "output_path", ".gif", animation: true);
-        GifExport.Save(output, project.Frames, project.FramesPerSecond, McpCanvas.Number(args, "scale", 1));
-        return new { path = output, frameCount = project.Frames.Count, fps = project.FramesPerSecond, loop = true };
+        var palette = GifPaletteFromArgs(args, project.Palette);
+        GifExport.Save(output, project.Frames, project.FramesPerSecond, McpCanvas.Number(args, "scale", 1), palette: palette);
+        return new { path = output, frameCount = project.Frames.Count, fps = project.FramesPerSecond, loop = true, palette = palette is null ? "auto" : "custom", paletteColors = palette?.Length ?? 0 };
+    }
+
+    private static int[]? GifPaletteFromArgs(JsonObject args, IReadOnlyList<string> projectPalette)
+    {
+        bool useProject = args["use_project_palette"]?.GetValue<bool>() == true;
+        if (useProject && args["palette"] is not null) throw new ArgumentException("palette 与 use_project_palette 不能同时使用。");
+        if (args["palette"] is JsonNode node) return PaletteFile.Validate(node).Select(PaletteFile.ToArgb).ToArray();
+        if (!useProject) return null;
+        if (projectPalette.Count is < 1 or > 255) throw new ArgumentException($"工程调色板有 {projectPalette.Count} 色；GIF 索引色最多 255 色，请先精简调色板。");
+        return projectPalette.Select(PaletteFile.ToArgb).ToArray();
     }
 
     private static object ExportSpriteSheetFile(JsonObject args, ProjectFile.LoadResult project)

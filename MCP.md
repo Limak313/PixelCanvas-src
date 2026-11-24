@@ -43,7 +43,7 @@ Codex 桌面插件使用其自身的插件管理方式；独立部署包与 Code
 
 多帧工程中，画布工具操作当前帧；`canvas_info` 返回帧数、当前帧索引、帧率和播放状态。`canvas_add_frame`、`canvas_select_frame`、`canvas_delete_frame`、`canvas_import_frame` 和 `canvas_set_playback` 可管理当前窗口的动画帧；帧索引从 0 开始，删除需明确确认，确认后仍可用 `canvas_undo` 撤销。播放期间修改画布的 MCP 请求会被拒绝，停止播放后可继续编辑。工程文件工具修改当前帧并另存时会保留其他帧。
 
-`canvas_export_gif` 和 `project_export_gif` 将全部帧导出为循环 GIF，未指定路径时保存到 `output\动画`。可指定 1–16 倍缩放，总输出像素（宽 × 高 × 帧数）不超过 16,777,216。GIF 保留透明像素和可见图层合成，但不保留独立图层；超过 255 种不透明颜色时量化。帧延时按 GIF 的百分之一秒精度近似帧率。要继续编辑请另存 `.pxproj`。
+`canvas_export_gif` 和 `project_export_gif` 将全部帧导出为循环 GIF，未指定路径时保存到 `output\动画`。可指定 1–16 倍缩放，总输出像素（宽 × 高 × 帧数）不超过 16,777,216。GIF 保留透明像素和可见图层合成，但不保留独立图层。调色板有两种模式：省略 `palette` / `use_project_palette` 时自动输出，最多 255 色、超出后量化；传 `palette`（1–255 个 `#RRGGBB`）或 `use_project_palette=true` 时按给定顺序写入固定索引色，透明固定索引 0，画面外颜色映射到最近色。两者不能同时使用，工程调色板超过 255 色会报错。帧延时按 GIF 的百分之一秒精度近似帧率。要继续编辑请另存 `.pxproj`。
 
 `canvas_preview` 以 MCP 图片返回当前帧的可见图层合成 PNG，不含网格与参考图；`max_side` 为 1–512，默认 512。`canvas_batch_frames` 向末尾一次追加 1–32 帧；每项 `copy=true` 复制上一项（第一项复制当前帧），否则新建空白帧，每项可提供与 `canvas_batch_paint` 相同的 `operations`；可选 `fps`。整批成功后切换到最后一帧，失败不修改动画或帧率。整批最多 256 个操作、16384 个显式像素，每帧最多 64 操作；整批作为一步撤销。
 

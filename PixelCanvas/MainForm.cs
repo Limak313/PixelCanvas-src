@@ -1224,8 +1224,9 @@ public sealed partial class MainForm : Form
             }
             if (string.Equals(Path.GetExtension(dlg.FileName), ".gif", StringComparison.OrdinalIgnoreCase))
             {
+                if (!AskGifPalette(out var gifPalette)) return;
                 SyncCurrentFrame();
-                GifExport.Save(dlg.FileName, _frames, _fps, scale, overwrite: true);
+                GifExport.Save(dlg.FileName, _frames, _fps, scale, overwrite: true, palette: gifPalette);
                 return;
             }
             using var bmp = new Bitmap(_grid.Width * scale, _grid.Height * scale, PixelFormat.Format32bppArgb);
@@ -1245,6 +1246,51 @@ public sealed partial class MainForm : Form
             MessageBox.Show(this, "导出失败：" + ex.Message, "导出图片或动画",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+
+    /// <summary>GIF 导出前选择调色板；返回 false 表示取消导出。</summary>
+    private bool AskGifPalette(out IReadOnlyList<int>? palette)
+    {
+        palette = null;
+        int count = _palette.Count;
+        bool projectUsable = count is >= 1 and <= 255;
+        using var dialog = new Form
+        {
+            Text = "GIF 调色板",
+            ClientSize = new Size(430, 166),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MinimizeBox = false,
+            MaximizeBox = false,
+            ShowInTaskbar = false
+        };
+        var auto = new RadioButton
+        {
+            Text = "自动：最多 255 色，超出后用内置色板量化",
+            Left = 18, Top = 18, Width = 390, Height = 24, Checked = true,
+            AccessibleName = "GIF 自动调色板"
+        };
+        var project = new RadioButton
+        {
+            Text = projectUsable
+                ? $"工程调色板：{count} 色，按索引输出，画面外颜色映射到最近色"
+                : $"工程调色板：{count} 色，超过 255 色不可用",
+            Left = 18, Top = 52, Width = 390, Height = 24,
+            Enabled = projectUsable,
+            AccessibleName = "GIF 工程调色板"
+        };
+        var hint = new Label
+        {
+            Text = "固定索引色会让导出结果与工程色板完全一致，适合后续引擎或 GIF 调色板替换。",
+            Left = 18, Top = 82, Width = 390, Height = 34, ForeColor = SystemColors.GrayText
+        };
+        var ok = new Button { Text = "导出", Left = 232, Top = 126, Width = 84, DialogResult = DialogResult.OK };
+        var cancel = new Button { Text = "取消", Left = 326, Top = 126, Width = 84, DialogResult = DialogResult.Cancel };
+        dialog.Controls.AddRange(new Control[] { auto, project, hint, ok, cancel });
+        dialog.AcceptButton = ok; dialog.CancelButton = cancel;
+        if (dialog.ShowDialog(this) != DialogResult.OK) return false;
+        if (project.Checked) palette = _palette.Select(PaletteFile.ToArgb).ToArray();
+        return true;
     }
 
     // ---------- 快捷键 / 关闭 ----------

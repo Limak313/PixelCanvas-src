@@ -25,7 +25,7 @@
 - 导出 PNG：1×–16× 最近邻放大，无网格线、透明背景保留。
 - 导出 SVG：把当前帧的可见图层写成矢量色块，相邻同色像素合并为矩形，透明留空；任意缩放不失真，便于排版或继续在矢量软件里编辑。
 - 导出序列帧：动画栏“序列帧”把全部帧逐张写成 PNG（`frame-001.png`…）到动画目录下的新文件夹，默认沿用当前导出倍数，不覆盖已有文件。
-- 导出 GIF：多帧画布的导出对话框默认选择循环 GIF，保存到动画文件夹；支持透明背景和 1×–16× 最近邻放大。GIF 最多使用 255 种不透明颜色，超过时会量化。普通工程保存仍为可编辑的 `.pxproj`。
+- 导出 GIF：多帧画布的导出对话框默认选择循环 GIF，保存到动画文件夹；支持透明背景和 1×–16× 最近邻放大。导出前可选调色板：自动模式最多 255 色、超出时量化；工程调色板模式把 1–255 色按顺序写成固定索引色，画面外颜色映射到最近色，透明固定索引 0。普通工程保存仍为可编辑的 `.pxproj`。
 - 其他：网格线开关、悬停笔刷高亮、整数倍自动缩放（高 DPI 支持）。
 
 ## 界面预览
@@ -77,7 +77,7 @@ dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Cate
 dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Category=UI"
 ```
 
-测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、原子写入、撤销历史落盘、绘画算法、调色板为无头可运行的核心用例；`UiSmokeTests` 的 9 条界面路径用例按环境依赖分两组：7 条只要求能创建窗体句柄，标 `Category=UiHost`，随默认门禁进入 CI；2 条依赖播放定时器消息泵与时间轴坐标映射（`FrameHistory_SwitchFrameUndoAndPlayback`、`AnimationFrames_OnionSkin_ReorderAndTimelineDrag`），标 `Category=UI`，在本机用 `-Ui` 执行。`FrameUndoTests`、`LayerUndoTests` 与 `UiHostProbeTests` 同属 `Category=UiHost`，分别覆盖帧与图层的结构撤销、以及运行环境能否承载界面用例；`UndoJournalTests` 为无头用例，覆盖撤销历史落盘的栈序还原、拒绝不匹配文件与步数截断；`ExportFormatsTests` 与 `McpExportFormatTests` 覆盖 SVG 色块合并、序列帧命名与缩放、非空目录拒绝，以及新增导出动作的 MCP 路由；`McpRoutingTests` 锁住「每个操作只属于一个分组入口、`tool_info` 枚举为并集」。当前门禁 112 条，本机 UI 组 2 条。覆盖率由 coverlet 采集：当前行覆盖 **62.2%**（2404/3866 行）、分支 **42.8%**；CI 对行 55% / 分支 38% 设下限，低于下限即失败。
+测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、原子写入、撤销历史落盘、绘画算法、调色板为无头可运行的核心用例；`UiSmokeTests` 的 9 条界面路径用例按环境依赖分两组：7 条只要求能创建窗体句柄，标 `Category=UiHost`，随默认门禁进入 CI；2 条依赖播放定时器消息泵与时间轴坐标映射（`FrameHistory_SwitchFrameUndoAndPlayback`、`AnimationFrames_OnionSkin_ReorderAndTimelineDrag`），标 `Category=UI`，在本机用 `-Ui` 执行。`FrameUndoTests`、`LayerUndoTests` 与 `UiHostProbeTests` 同属 `Category=UiHost`，分别覆盖帧与图层的结构撤销、以及运行环境能否承载界面用例；`UndoJournalTests` 为无头用例，覆盖撤销历史落盘的栈序还原、拒绝不匹配文件与步数截断；`ExportFormatsTests` 与 `McpExportFormatTests` 覆盖 SVG 色块合并、序列帧命名与缩放、非空目录拒绝，以及新增导出动作的 MCP 路由；`McpRoutingTests` 锁住「每个操作只属于一个分组入口、`tool_info` 枚举为并集」。当前门禁 115 条，本机 UI 组 2 条。覆盖率由 coverlet 采集：当前行覆盖 **62.3%**（2488/3996 行）、分支 **43.4%**；CI 对行 55% / 分支 38% 设下限，低于下限即失败。
 
 ## 安装（最终用户）
 
