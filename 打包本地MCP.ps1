@@ -2,6 +2,8 @@
     [string]$PackageName = '',
     [ValidateSet('Slim', 'Bundle', 'All')]
     [string]$Mode = 'Slim',
+    [ValidateSet('win-x64', 'win-arm64')]
+    [string]$Rid = 'win-x64',
     [switch]$NoPlugin,
     [switch]$NoPackage
 )
@@ -20,8 +22,8 @@ function Resolve-PackageBase([string]$mode) {
         return $(if ($modes.Count -gt 1) { "$PackageName-$($mode.ToLower())" } else { $PackageName })
     }
     switch ($mode) {
-        'Slim'   { "PixelCanvas-$version-win-x64-slim" }
-        'Bundle' { "PixelCanvas-Agent-$version-win-x64" }
+        'Slim'   { "PixelCanvas-$version-$Rid-slim" }
+        'Bundle' { "PixelCanvas-Agent-$version-$Rid" }
         default  { throw "未知打包模式：$mode" }
     }
 }
@@ -69,9 +71,9 @@ function New-SlimPackage([string]$base) {
 
     $appDir = Join-Path $buildRoot 'app'
     $serverDir = Join-Path $buildRoot 'server'
-    dotnet publish $appProject -c Release -p:PublishSingleFile=true --self-contained false -p:DebugType=none -o $appDir
+    dotnet publish $appProject -c Release -r $Rid -p:PublishSingleFile=true --self-contained false -p:DebugType=none -o $appDir
     if ($LASTEXITCODE -ne 0) { throw '桌面程序发布失败。' }
-    dotnet publish $serverProject -c Release -p:PublishSingleFile=true --self-contained false -p:DebugType=none -o $serverDir
+    dotnet publish $serverProject -c Release -r $Rid -p:PublishSingleFile=true --self-contained false -p:DebugType=none -o $serverDir
     if ($LASTEXITCODE -ne 0) { throw 'MCP 服务发布失败。' }
 
     New-Item -ItemType Directory -Path (Join-Path $packageRoot 'app'), (Join-Path $packageRoot 'server') -Force | Out-Null
@@ -87,45 +89,32 @@ function New-SlimPackage([string]$base) {
     Write-Host "已生成框架依赖单文件包：$zipPath"
 }
 
-# ---------- Bundle：自包含运行时目录（免安装 .NET，体积最大） ----------
+# ---------- Bundle：自包含单文件（免安装 .NET，可作为 win-arm64 交叉发布） ----------
 function New-BundlePackage([string]$base) {
     $buildRoot = Join-Path $projectRoot "$base-build"
     $packageRoot = Join-Path $projectRoot $base
     $zipPath = Join-Path $projectRoot "$base.zip"
     foreach ($path in @($packageRoot, $zipPath, $buildRoot)) { if (Test-Path -LiteralPath $path) { throw "目标已存在，请选择其他 PackageName：$path" } }
 
-    dotnet build $appProject -c Release --artifacts-path $buildRoot --no-incremental
-    if ($LASTEXITCODE -ne 0) { throw '构建失败。' }
-    dotnet build $serverProject -c Release --artifacts-path $buildRoot --no-incremental
-    if ($LASTEXITCODE -ne 0) { throw '构建失败。' }
-    $appOut = Join-Path $buildRoot 'bin\PixelCanvas\release'
-    $serverOut = Join-Path $buildRoot 'bin\PixelCanvas.Mcp\release'
+    $appOut = Join-Path $buildRoot 'app'
+    $serverOut = Join-Path $buildRoot 'server'
+    dotnet publish $appProject -c Release -r $Rid --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -o $appOut
+    if ($LASTEXITCODE -ne 0) { throw '桌面程序自包含发布失败。' }
+    dotnet publish $serverProject -c Release -r $Rid --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -o $serverOut
+    if ($LASTEXITCODE -ne 0) { throw 'MCP 服务自包含发布失败。' }
 
-    # 自包含部署包（携带 .NET 10 桌面运行时）
-    $dotnetRoot = Split-Path -Parent (Get-Command dotnet.exe -ErrorAction Stop).Source
-    $coreRoot = Join-Path $dotnetRoot 'shared\Microsoft.NETCore.App'
-    $desktopRoot = Join-Path $dotnetRoot 'shared\Microsoft.WindowsDesktop.App'
-    $versions = @(Get-ChildItem -LiteralPath $coreRoot -Directory | Where-Object { $_.Name -match '^10\.0\.\d+$' -and (Test-Path -LiteralPath (Join-Path $desktopRoot $_.Name)) } | Sort-Object { [version]$_.Name } -Descending)
-    if ($versions.Count -eq 0) { throw '需要本机安装 .NET 10 x64 和 Windows Desktop 运行时。' }
-    $rtVersion = $versions[0].Name
-    if (!(Test-Path -LiteralPath (Join-Path $dotnetRoot "host\fxr\$rtVersion\hostfxr.dll"))) { throw "找不到匹配的 hostfxr：$rtVersion" }
-    foreach ($dir in @('app', 'server', 'runtime\host\fxr', 'runtime\shared\Microsoft.NETCore.App', 'runtime\shared\Microsoft.WindowsDesktop.App')) { New-Item -ItemType Directory -Path (Join-Path $packageRoot $dir) -Force | Out-Null }
-    foreach ($name in $appFiles) { Copy-Item -LiteralPath (Join-Path $appOut $name) -Destination (Join-Path $packageRoot 'app') }
-    Copy-Item -LiteralPath (Join-Path $appOut 'PixelCanvas.Core.dll') -Destination (Join-Path $packageRoot 'app')
+    New-Item -ItemType Directory -Path (Join-Path $packageRoot 'app'), (Join-Path $packageRoot 'server'), (Join-Path $packageRoot 'runtime') -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $appOut 'PixelCanvas.exe') -Destination (Join-Path $packageRoot 'app')
     Copy-Item -LiteralPath (Join-Path $projectRoot 'PixelCanvas\Assets\pixelcanvas.ico') -Destination (Join-Path $packageRoot 'app') -Force
-    foreach ($name in @('PixelCanvas.Mcp.exe', 'PixelCanvas.Mcp.dll', 'PixelCanvas.Mcp.deps.json', 'PixelCanvas.Mcp.runtimeconfig.json')) { Copy-Item -LiteralPath (Join-Path $serverOut $name) -Destination (Join-Path $packageRoot 'server') }
-    foreach ($name in $appFiles) { Copy-Item -LiteralPath (Join-Path $appOut $name) -Destination (Join-Path $packageRoot 'server') }
-    Copy-Item -LiteralPath (Join-Path $serverOut 'PixelCanvas.Core.dll') -Destination (Join-Path $packageRoot 'server')
-    Copy-Item -LiteralPath (Join-Path $dotnetRoot 'dotnet.exe'), (Join-Path $dotnetRoot 'LICENSE.txt'), (Join-Path $dotnetRoot 'ThirdPartyNotices.txt') -Destination (Join-Path $packageRoot 'runtime')
-    Copy-Item -LiteralPath (Join-Path $dotnetRoot "host\fxr\$rtVersion") -Destination (Join-Path $packageRoot 'runtime\host\fxr') -Recurse
-    Copy-Item -LiteralPath (Join-Path $coreRoot $rtVersion) -Destination (Join-Path $packageRoot 'runtime\shared\Microsoft.NETCore.App') -Recurse
-    Copy-Item -LiteralPath (Join-Path $desktopRoot $rtVersion) -Destination (Join-Path $packageRoot 'runtime\shared\Microsoft.WindowsDesktop.App') -Recurse
+    Copy-Item -LiteralPath (Join-Path $serverOut 'PixelCanvas.Mcp.exe') -Destination (Join-Path $packageRoot 'server')
+    $dotnetRoot = Split-Path -Parent (Get-Command dotnet.exe -ErrorAction Stop).Source
+    foreach ($name in @('LICENSE.txt', 'ThirdPartyNotices.txt')) { Copy-Item -LiteralPath (Join-Path $dotnetRoot $name) -Destination (Join-Path $packageRoot 'runtime') }
     Copy-Item -Path (Join-Path $projectRoot 'Agent部署包\*') -Destination $packageRoot -Recurse
     Move-Item -LiteralPath (Join-Path $packageRoot 'README.md') -Destination (Join-Path $packageRoot 'DEPLOYMENT-README.md')
     Copy-Item -LiteralPath (Join-Path $projectRoot 'README.md'), (Join-Path $projectRoot 'MCP.md') -Destination $packageRoot
 
     [System.IO.Compression.ZipFile]::CreateFromDirectory($packageRoot, $zipPath, [System.IO.Compression.CompressionLevel]::Optimal, $true)
-    Write-Host "已生成自包含部署包：$zipPath（运行时 $rtVersion）"
+    Write-Host "已生成自包含单文件包：$zipPath（$Rid）"
 }
 
 foreach ($mode in $modes) {

@@ -86,37 +86,38 @@ dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Cate
 
 ## 安装（最终用户）
 
-发布页提供 `PixelCanvas-<version>-win-x64-setup.exe`（自包含安装包，约 52 MB）：
+发布页按架构提供 `PixelCanvas-<version>-win-x64-setup.exe` 与 `PixelCanvas-<version>-win-arm64-setup.exe`（自包含安装包，约 52 MB）：
 
-1. 双击安装，安装到当前用户目录 `%LOCALAPPDATA%\Programs\PixelCanvas`，无需管理员权限、无需预装 .NET。
+1. 双击对应架构的安装包，安装到当前用户目录 `%LOCALAPPDATA%\Programs\PixelCanvas`，无需管理员权限、无需预装 .NET。Windows 11 ARM 设备请选 arm64，x64 设备选 x64。
 2. 安装器创建开始菜单项与可选桌面快捷方式；卸载走“设置 → 应用”或安装目录里的 `unins000.exe`，不会删除你自己保存的工程与输出。
 3. 安装包未做代码签名，首次运行可能出现 SmartScreen 提示，选择“更多信息 → 仍要运行”即可。
 4. 只需要便携使用、或要接 Agent 插件时，仍可下载 zip 包，见下节。
 
 ## 发布打包
 
-打包脚本 `打包本地MCP.ps1` 先按 Release 构建，再按 `-Mode` 组装部署包并生成 zip。默认 `Slim`：
+打包脚本 `打包本地MCP.ps1` 先按 Release 构建，再按 `-Mode` 与 `-Rid` 组装部署包并生成 zip。默认 `Slim` + `win-x64`：
 
 ```powershell
-# 框架依赖单文件精简包（约 1 MB，需要目标机已装 .NET 10 桌面运行时）
+# 框架依赖单文件精简包（约 1 MB，需要目标机已装对应架构的 .NET 10 桌面运行时）
 powershell -NoProfile -ExecutionPolicy Bypass -File .\打包本地MCP.ps1
 
-# 自包含部署包（携带 .NET 10 桌面运行时，解压约 170 MB，免安装）
+# 自包含单文件包（app 与 server 各自携带运行时，解压约 180–200 MB，免安装）
 powershell -NoProfile -ExecutionPolicy Bypass -File .\打包本地MCP.ps1 -Mode Bundle
 
-# 两种都出
-powershell -NoProfile -ExecutionPolicy Bypass -File .\打包本地MCP.ps1 -Mode All
+# 两种都出；-Rid win-arm64 交叉产出 Windows ARM64 包（可在 x64 机器上构建）
+powershell -NoProfile -ExecutionPolicy Bypass -File .\打包本地MCP.ps1 -Mode All -Rid win-arm64
 
-# 生成自包含安装包（默认先出 Bundle 部署包再压成 setup.exe，约 52 MB）
-powershell -NoProfile -ExecutionPolicy Bypass -File .\安装包\生成安装包.ps1
+# 生成对应架构的自包含安装包（输出名自动带架构）
+powershell -NoProfile -ExecutionPolicy Bypass -File .\安装包\生成安装包.ps1 -Rid win-x64
+powershell -NoProfile -ExecutionPolicy Bypass -File .\安装包\生成安装包.ps1 -Rid win-arm64
 ```
 
-- 包名默认按 `Directory.Build.props` 的版本号生成：`PixelCanvas-<version>-win-x64-slim`（Slim）与 `PixelCanvas-Agent-<version>-win-x64`（Bundle）；可用 `-PackageName` 覆盖。
-- 两种包的 `app` 与 `server` 目录结构一致，靠 `server` 里是 `PixelCanvas.Mcp.exe`（精简）还是 `runtime\dotnet.exe` + `PixelCanvas.Mcp.dll`（自包含）区分，`Agent部署包\生成客户端配置.ps1` 会自动适配。
-- 默认会把 Release 产物同步刷新到插件目录 `pixelcanvas-plugin\plugins\pixelcanvas-desktop-v*\app` 与 `server`（排除 pdb）；`-NoPlugin` 可跳过刷新，`-NoPackage` 只刷新插件不生成部署包。
+- 包名按 `Directory.Build.props` 版本号与架构生成：`PixelCanvas-<version>-<rid>-slim`、`PixelCanvas-Agent-<version>-<rid>`；可用 `-PackageName` 覆盖。
+- 两种包均为 `app` + `server` 两个目录；`server` 里始终是 `PixelCanvas.Mcp.exe`，自包含包的两个 exe 各约 70–110 MB。`runtime` 目录只放 .NET 许可证，不再复制共享运行时。
+- 默认会把 Release 产物同步刷新到插件目录 `pixelcanvas-plugin\plugins\pixelcanvas-desktop-v*\app` 与 `server`（排除 pdb）；`-NoPlugin` 可跳过刷新，`-NoPackage` 只刷新插件不生成部署包。插件当前仍为 x64，Windows ARM 上依赖 x64 .NET 运行时或 x64 模拟。
 - 生成的部署包目录、`.zip`、`output/` 均在 `.gitignore` 中，不纳入版本管理。
-- 部署包产出后，可用 `pixelcanvas-batch-check.ps1 -PackageRoot <部署包目录>` 做一次跨进程 MCP 绘画与读取校验（两种包都支持）。
-- 安装包脚本复用 Bundle 目录：`.\安装包\生成安装包.ps1 -PackageRoot PixelCanvas-Agent-<version>-win-x64` 可跳过重复打包；脚本需要 Inno Setup 6，本机缺失时会尝试从 GitHub 取官方安装器。
+- 部署包产出后，可用 `pixelcanvas-batch-check.ps1 -PackageRoot <部署包目录>` 做一次跨进程 MCP 绘画与读取校验（两种包都支持；arm64 包需在 ARM 设备上运行）。
+- 安装包脚本复用 Bundle 目录：`.\安装包\生成安装包.ps1 -PackageRoot PixelCanvas-Agent-<version>-win-x64 -Rid win-x64` 可跳过重复打包；脚本需要 Inno Setup 6，本机缺失时会尝试从 GitHub 取官方安装器。Inno Setup 可在 x64 机器上交叉编译 arm64 安装包。
 
 ## 运行方法
 

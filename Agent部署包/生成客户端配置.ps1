@@ -3,7 +3,7 @@ $root = $PSScriptRoot
 $runtime = Join-Path $root 'runtime\dotnet.exe'
 $serverDll = Join-Path $root 'server\PixelCanvas.Mcp.dll'
 $serverExe = Join-Path $root 'server\PixelCanvas.Mcp.exe'
-# 自包含包用 runtime\dotnet.exe 启动服务 dll；框架依赖的精简包直接启动单文件服务 exe。
+# 自包含单文件包与精简包都直接启动 server\PixelCanvas.Mcp.exe；runtime 目录只保留许可证时忽略。
 if (Test-Path -LiteralPath $runtime -PathType Leaf) {
     if (!(Test-Path -LiteralPath $serverDll -PathType Leaf)) { throw '部署包不完整，请保留 runtime、server 和 app 文件夹。' }
     $command = $runtime
@@ -12,7 +12,7 @@ if (Test-Path -LiteralPath $runtime -PathType Leaf) {
     $command = $serverExe
     $serverArgs = @()
 } else {
-    throw '部署包不完整：缺少 server\PixelCanvas.Mcp.exe（精简包）或 runtime\dotnet.exe + server\PixelCanvas.Mcp.dll（自包含包）。'
+    throw '部署包不完整：缺少 server\PixelCanvas.Mcp.exe。'
 }
 $output = Join-Path $root 'output'
 New-Item -ItemType Directory -Path $output -Force | Out-Null

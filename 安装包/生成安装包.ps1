@@ -2,6 +2,8 @@ param(
     # 已生成的部署包目录（默认先调用 打包本地MCP.ps1 生成临时 Bundle 包）
     [string]$PackageRoot = '',
     [string]$OutputPath = '',
+    [ValidateSet('win-x64', 'win-arm64')]
+    [string]$Rid = 'win-x64',
     [switch]$KeepPackage
 )
 $ErrorActionPreference = 'Stop'
@@ -12,14 +14,15 @@ $tempBase = 'pc-installer-payload'
 [xml]$props = Get-Content -LiteralPath (Join-Path $projectRoot 'Directory.Build.props')
 $version = [string]$props.Project.PropertyGroup.Version
 if ([string]::IsNullOrWhiteSpace($version)) { throw 'Directory.Build.props 未设置 Version。' }
-if ([string]::IsNullOrWhiteSpace($OutputPath)) { $OutputPath = Join-Path $projectRoot "PixelCanvas-$version-win-x64-setup.exe" }
+if ([string]::IsNullOrWhiteSpace($OutputPath)) { $OutputPath = Join-Path $projectRoot "PixelCanvas-$version-$Rid-setup.exe" }
+$targetArch = if ($Rid -eq 'win-arm64') { 'arm64' } else { 'x64compatible' }
 
 $cleanup = @()
 if ([string]::IsNullOrWhiteSpace($PackageRoot)) {
     foreach ($path in @((Join-Path $projectRoot $tempBase), (Join-Path $projectRoot "$tempBase.zip"), (Join-Path $projectRoot "$tempBase-build"))) {
         if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse -Force }
     }
-    & (Join-Path $projectRoot '打包本地MCP.ps1') -Mode Bundle -PackageName $tempBase -NoPlugin
+    & (Join-Path $projectRoot '打包本地MCP.ps1') -Mode Bundle -PackageName $tempBase -Rid $Rid -NoPlugin
     if ($LASTEXITCODE -ne 0) { throw '生成自包含部署包失败。' }
     $PackageRoot = Join-Path $projectRoot $tempBase
     if (-not $KeepPackage) { $cleanup = @($PackageRoot, (Join-Path $projectRoot "$tempBase.zip"), (Join-Path $projectRoot "$tempBase-build")) }
@@ -76,8 +79,8 @@ UninstallDisplayIcon={app}\app\PixelCanvas.exe
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
+ArchitecturesAllowed=$targetArch
+ArchitecturesInstallIn64BitMode=$targetArch
 LicenseFile=$projectRoot\LICENSE
 CloseApplications=yes
 RestartApplications=no

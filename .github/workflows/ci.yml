@@ -56,6 +56,10 @@ jobs:
           --results-directory coverage
           --logger "trx;LogFileName=pixelcanvas-tests.trx"
 
+      - name: Cross-build Windows arm64 self-contained bundle
+        shell: pwsh
+        run: .\打包本地MCP.ps1 -Mode Bundle -Rid win-arm64 -NoPlugin
+
       - name: Build coverage report
         if: always()
         run: |

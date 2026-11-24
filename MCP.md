@@ -6,9 +6,9 @@ PixelCanvas 提供本地标准输入 / 输出（stdio）MCP 服务。连接正�
 
 ## 启动
 
-使用独立部署包时，运行包内 `生成客户端配置.ps1`，将生成的 `mcp-config.json` 中 `pixelcanvas` 服务合并到客户端配置。命令为包内 `runtime\dotnet.exe`，参数为包内 `server\PixelCanvas.Mcp.dll` 的绝对路径。客户端负责启动和停止 MCP 服务，不需要长期打开终端。其他客户端的配置位置和具体格式以其自身说明为准。
+使用独立部署包时，运行包内 `生成客户端配置.ps1`，将生成的 `mcp-config.json` 中 `pixelcanvas` 服务合并到客户端配置。命令为包内 `server\PixelCanvas.Mcp.exe` 的绝对路径；自包含包与精简包结构相同，区别是前者两个 exe 各自携带 .NET 运行时。客户端负责启动和停止 MCP 服务，不需要长期打开终端。其他客户端的配置位置和具体格式以其自身说明为准。
 
-Codex 桌面插件使用其自身的插件管理方式；独立部署包与 Codex 插件可以并存。部署包要求 Windows x64 桌面会话，并附带 .NET 10 运行时，不提供网络服务。
+Codex 桌面插件使用其自身的插件管理方式；独立部署包与 Codex 插件可以并存。部署包要求 Windows x64 或 Windows arm64 桌面会话，不提供网络服务；请选择与系统架构一致的包。
 
 ## 工具入口
 

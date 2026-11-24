@@ -2,6 +2,22 @@
 
 本项目遵循语义化版本；版本号由根目录 `Directory.Build.props` 集中管理，桌面程序、MCP 服务与插件清单对齐同一版本。
 
+## [1.0.41] - 2026-11-24
+
+### 新增
+- Windows ARM64 覆盖：`打包本地MCP.ps1` 新增 `-Rid win-x64|win-arm64`，可在 x64 机器上交叉产出 ARM64 的精简包、自包含包与 `PixelCanvas-<version>-win-arm64-setup.exe`。Inno Setup 按目标架构写入 `ArchitecturesAllowed` / `ArchitecturesInstallIn64BitMode`，安装包不再只接受 x64。
+
+### 变更
+- 自包含包改为单文件：`app\PixelCanvas.exe` 与 `server\PixelCanvas.Mcp.exe` 各自携带 .NET 10 运行时，不再解包共享的 `runtime\dotnet.exe` 运行时目录；`runtime` 只保留 .NET 许可证与第三方声明。解压体积约 180–200 MB，压缩包约 74–77 MB。
+- 打包脚本与安装包脚本接受 `-Rid`，输出文件名自动带上 `win-x64` / `win-arm64`；发布工作流同时构建两种架构的 setup、slim 与 Agent 包。Agent 插件仍为 x64。
+
+### 修复
+- 修正 `.gitignore` 的 `PixelCanvas-*/` 规则：根目录包目录仍忽略，但不再误伤 `pixelcanvas-plugin\plugins\pixelcanvas-desktop-v*`。
+- `pixelcanvas-batch-check.ps1` 的 `DOTNET_ROOT_<ARCH>` 改为按实际架构设置，不再只写 `X64`。
+
+### 测试
+- x64 与 arm64 包均已交叉构建并通过 PE 头校验（app / server 为 `0xAA64`）；x64 自包含包通过跨进程 MCP 绘画与读取检查。arm64 包需在 ARM 设备上执行运行期检查。
+
 ## [1.0.40] - 2026-11-24
 
 ### 变更

@@ -1,10 +1,11 @@
 ﻿param([Parameter(Mandatory = $true)][string]$PackageRoot)
 $ErrorActionPreference = 'Stop'
-# 自包含包携带 runtime 目录；框架依赖的精简包直接跑单文件 exe。
+# 兼容旧的共享运行时包；新版自包含单文件包没有 runtime 目录，直接跑 server exe。
 $runtimeExe = Join-Path $PackageRoot 'runtime\dotnet.exe'
 if (Test-Path -LiteralPath $runtimeExe) {
     $env:DOTNET_ROOT = Join-Path $PackageRoot 'runtime'
-    $env:DOTNET_ROOT_X64 = $env:DOTNET_ROOT
+    $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToUpperInvariant()
+    Set-Item -Path "env:DOTNET_ROOT_$arch" -Value $env:DOTNET_ROOT
 }
 $app = Start-Process -FilePath (Join-Path $PackageRoot 'app\PixelCanvas.exe') -ArgumentList '4','4' -PassThru
 $server = [Diagnostics.Process]::new()
