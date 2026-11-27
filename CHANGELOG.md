@@ -2,14 +2,25 @@
 
 本项目遵循语义化版本；版本号由根目录 `Directory.Build.props` 集中管理，桌面程序、MCP 服务与插件清单对齐同一版本。
 
-## [未发布]
+## [未发布]（1.0.47）
+
+### 新增
+- 自动更新：启动时每 24 小时静默检查一次 GitHub 最新正式 Release，也可从状态栏“检查更新”手动检查；发现新版本后展示版本、发布说明与安装包大小，由用户确认后才下载。
+- 更新包下载后按 Release 的 `.sha256` 校验，校验失败或缺少校验文件会直接拒绝；支持用 `PIXELCANVAS_UPDATE_SIGNER_THUMBPRINT` 固定 Authenticode 签名者指纹，防止替换包。
+- 更新时先保存工程或写入恢复副本，再静默启动安装器并退出程序；更新偏好写入 `%LOCALAPPDATA%\PixelCanvas\update-settings.json`，可在更新对话框中关闭启动检查。
+- 崩溃上报：捕获 UI 线程、`AppDomain` 与未观察任务异常，默认把 JSON/TXT 报告写入 `%LOCALAPPDATA%\PixelCanvas\CrashReports`；设置 `PIXELCANVAS_CRASH_ENDPOINT` 后可把同一份 JSON POST 到 HTTPS 端点（本机回环 HTTP 也可用于调试），不包含工程内容、用户名或机器名。
 
 ### 变更
 - 安装器签名覆盖主程序 `PixelCanvas.exe`、MCP 入口 `PixelCanvas.Mcp.exe` 与 Setup.exe，不再只签安装包外壳。
 - 支持 PFX、本机证书指纹与 CI Base64 Secret 三种证书来源；配置签名后 Release 工作流强制要求 Authenticode 有效。
 - 新增 `安装包\创建测试证书.ps1`，可生成开发用自签名证书；私钥落在 `.signing\` 并被 `.gitignore` 排除。
 - 验证脚本增加已安装主程序/MCP 的签名者一致性检查。
-- 清理 1.0.38–1.0.45 本地旧安装包、旧 zip、重复解包/构建目录，以及不再被 marketplace 引用的旧插件版本；仅保留 1.0.46 当前产物。
+- 清理 1.0.38–1.0.45 本地旧安装包、旧 zip、重复解包/构建目录，以及不再被 marketplace 引用的旧插件版本；仅保留当前版本产物。
+- 版本与插件目录同步到 1.0.47 / v1047。
+
+### 测试
+- 无头门禁 191 条（Core 122 + Windows 69）通过；新增更新版本/资产解析、下载校验、崩溃报告与本地上报、更新对话框、签名者固定等 41 条用例。
+- 行覆盖约 69.8%、分支约 42.2%（CI 下限 55% / 38%）。
 
 ## [1.0.46] - 2026-11-27
 

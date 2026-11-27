@@ -13,15 +13,24 @@ internal static class Program
         // 只作为“程序正在运行”的标记供安装器检测；不阻止同用户启动多个编辑窗口。
         using var appMutex = new Mutex(true, @"Local\PixelCanvas.Running", out _);
 
-        int width = 32, height = 32;
-        if (args.Length != 0 && (args.Length != 2 || !int.TryParse(args[0], out width) || !int.TryParse(args[1], out height) || width is < 4 or > 512 || height is < 4 or > 512))
+        try
         {
-            MessageBox.Show("画布宽高必须是 4 至 512 之间的整数。", "PixelCanvas", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            return;
+            int width = 32, height = 32;
+            if (args.Length != 0 && (args.Length != 2 || !int.TryParse(args[0], out width) || !int.TryParse(args[1], out height) || width is < 4 or > 512 || height is < 4 or > 512))
+            {
+                MessageBox.Show("画布宽高必须是 4 至 512 之间的整数。", "PixelCanvas", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            CrashHandler.Install();
+            Application.Run(new MainForm(width, height));
         }
-        Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
-        Application.EnableVisualStyles();
-        Application.SetCompatibleTextRenderingDefault(false);
-        Application.Run(new MainForm(width, height));
+        catch (Exception exception)
+        {
+            CrashHandler.Handle(exception, "Program.Main", terminate: true);
+        }
     }
 }

@@ -37,4 +37,10 @@ internal static class AppPaths
 
     /// <summary>自动恢复副本目录。</summary>
     public static string RecoveryRoot => Path.Combine(LocalAppDataRoot, "Recovery");
+
+    /// <summary>自动更新下载目录。</summary>
+    public static string UpdateRoot => Path.Combine(LocalAppDataRoot, "Updates");
+
+    /// <summary>崩溃报告目录。</summary>
+    public static string CrashReportRoot => Path.Combine(LocalAppDataRoot, "CrashReports");
 }

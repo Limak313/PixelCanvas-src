@@ -65,7 +65,8 @@ public sealed partial class MainForm : Form
         UpdateUndoButtons();
         UpdateSizeLabel();
         SetTool(ToolKind.Pencil);
-        _autosaveTimer.Tick += (_, _) => SaveRecovery();
+        _updatePreferences = UpdatePreferencesFile.Load(AppPaths.LocalAppDataRoot);
+        _autosaveTimer.Tick += (_, _) => { SaveRecovery(); };
     }
 
     private string TitleText() =>
@@ -166,6 +167,16 @@ public sealed partial class MainForm : Form
             Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
             ForeColor = Color.FromArgb(205, 218, 234), AutoEllipsis = true
         };
+        _updateLink = new LinkLabel
+        {
+            Text = "检查更新", Dock = DockStyle.Right, Width = 76,
+            TextAlign = ContentAlignment.MiddleCenter,
+            LinkColor = Color.FromArgb(129, 201, 239),
+            ActiveLinkColor = Color.FromArgb(255, 255, 255),
+            VisitedLinkColor = Color.FromArgb(129, 201, 239),
+        };
+        _updateLink.LinkClicked += async (_, _) => await CheckForUpdatesAsync(manual: true);
+        bar.Controls.Add(_updateLink);
         bar.Controls.Add(_statusText);
         bar.Controls.Add(_statusHint);
         return bar;
@@ -1559,6 +1570,11 @@ public sealed partial class MainForm : Form
     {
         base.OnFormClosing(e);
         if (e.Cancel) return;
+        if (_closingForUpdate)
+        {
+            ReleaseRecoveryLockOnly();
+            return;
+        }
         if (_playing) ToggleAnimation();
 
         if (!_dirty) { CloseRecovery(); return; }
@@ -1586,6 +1602,7 @@ public sealed partial class MainForm : Form
         StartMcpPipe();
         try { InitializeRecovery(); }
         finally { _recoveryPending = false; }
+        BeginInvoke(new Action(() => _ = CheckForUpdatesOnStartupAsync()));
     }
 
     private void InitializeRecovery()
@@ -1643,21 +1660,26 @@ public sealed partial class MainForm : Form
         }
     }
 
-    private void SaveRecovery()
+    private bool SaveRecovery()
     {
-        if (!_dirty || _canvas.InteractionInProgress || _recoveryLock is null) return;
+        if (!_dirty) return true;
+        if (_canvas.InteractionInProgress || _recoveryLock is null) return false;
         try
         {
             SyncCurrentFrame();
             ProjectFile.Save(RecoveryPath, _layers, _activeLayer, _palette, frames: _frames, activeFrame: _activeFrame, framesPerSecond: _fps);
             SaveRecoveryUndo();
             _autosaveErrorShown = false;
+            return true;
         }
         catch (Exception ex)
         {
-            if (_autosaveErrorShown) return;
-            _autosaveErrorShown = true;
-            MessageBox.Show(this, "自动保存失败，请手动保存工程：" + ex.Message, "自动保存", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            if (!_autosaveErrorShown)
+            {
+                _autosaveErrorShown = true;
+                MessageBox.Show(this, "自动保存失败，请手动保存工程：" + ex.Message, "自动保存", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            return false;
         }
     }
 

@@ -20,6 +20,8 @@
 - 工程保存 / 载入：Ctrl+S / Ctrl+O，`.pxproj`（UTF-8 JSON，按行 RLE 像素编码）；多帧工程保存全部帧、图层和帧率，并可读取旧版单帧工程。旧版程序无法打开多帧工程。
 - 工程文件上限：256 MiB，调色板最多 1024 色；超限时会提示错误并保留现有文件。旧版工程同样适用此上限。
 - 自动保存与恢复：未保存的修改每分钟写入独立恢复副本，并在副本旁写入像素撤销历史（`.undo`）；异常退出后下次启动可恢复，恢复后 Ctrl+Z 仍可回退到崩溃前若干步，需手动保存工程。
+- 自动更新：启动时每 24 小时检查一次 GitHub 最新正式 Release，状态栏“检查更新”可手动触发；发现新版本后由用户确认下载，安装包按 Release 的 `.sha256` 校验，并可固定签名者指纹。
+- 崩溃报告：捕获 UI 线程、`AppDomain` 与未观察任务异常，默认写本地 JSON/TXT 报告；显式配置 HTTPS 端点后才联网上报，报告不含工程内容、用户名或机器名。
 - 参考图：打开本地图片作为画布底图，可调整不透明度和显示状态；参考图不会保存在工程中或出现在导出的 PNG 中。
 - 沉浸画图：F11 进入或退出全屏画布，Esc 退出；F1 查看全部快捷键，F2 查看当前画布和工具状态。
 - 导出 PNG：1×–16× 最近邻放大，无网格线、透明背景保留。
@@ -70,7 +72,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\构建与测试.ps1 -Cover
 # 全量构建解决方案（PixelCanvas.Core / PixelCanvas.Mcp / PixelCanvas / 两个测试项目）
 dotnet build PixelCanvas.slnx -c Release
 
-# 运行全部无头测试（Core 86 条 + Windows 64 条，排除 InteractiveUI）
+# 运行全部无头测试（Core 122 条 + Windows 69 条，排除 InteractiveUI）
 dotnet test PixelCanvas.slnx -c Release --filter "Category!=InteractiveUI"
 
 # 只跑核心库测试（Linux/macOS 上可单独执行这一条）
@@ -82,7 +84,7 @@ dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Cate
 
 项目分层：`PixelCanvas.Core`（`net10.0`，像素模型、工程读写、撤销历史、GIF/SVG/PNG/精灵表/序列帧导出、路径与 MCP 画布模型，不引用 System.Drawing）；`PixelCanvas.Mcp`（`net10.0`，stdio MCP 宿主，文件级 `project_*` 工具与无头导出可跨平台，`open_canvas` 在非 Windows 返回明确错误）；`PixelCanvas`（`net10.0-windows` + WinForms 桌面界面）；`PixelCanvas.Core.Tests`（`net10.0`，可在 Linux CI 运行）；`PixelCanvas.Tests`（`net10.0-windows`，界面与位图相关用例）。
 
-测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、原子写入、撤销历史落盘、绘画算法、调色板为无头可运行的核心用例。界面侧共 40 条 `Category=UiHost`：`UiSmokeTests` 覆盖帧切换、图层、批量绘画、洋葱皮、时间轴、调色板/预设、参考图、选区与尺寸调整；`UiInteractionTests` 直接调用 `OnMouseDown/OnMouseMove/OnMouseUp/OnKeyDown`，覆盖画布点击/拖拽、右键取色、双轴镜像、选区移动、工具快捷键、镜像/网格/笔刷快捷键、Ctrl+Z/Y 与 F11/Esc；`CanvasGoldenTests` 对 `CanvasControl.NativeBitmap` 做 7 张像素级 golden（画笔、镜像、渐变、图层合成、选区移动、橡皮、直线），只比画布 RGBA，不依赖窗口 DPI 或主题；`FrameTimelineDropTests` 的 6 条纯函数用例覆盖时间轴落点。仅 2 条 `Category=InteractiveUI` 依赖真实 WinForms 消息泵：`PlaybackTimer_AdvancesFrameOnRealMessagePump` 用 `DoEvents` 做正负对照，`PlaybackTimer_AdvancesUnderApplicationRun` 用 `Application.Run` + 6 秒看门狗验证真实消息循环。播放帧推进已抽成 `MainForm.AdvancePlayback(elapsedMs)`，时间轴落点已抽成 `FrameTimeline.ResolveDrop`。当前门禁 150 条（Core 86 + Windows 64）全部通过；本机交互组 2 条通过。覆盖率由 coverlet 采集：当前行覆盖 **65.0%**、分支 **46.5%**；CI 对行 55% / 分支 38% 设下限。CI 另有非阻塞 `ui-probe` 在 `windows-latest` 连跑 20 次 `InteractiveUI`，全部通过前不把该组设为 PR 阻塞门禁。
+测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、原子写入、撤销历史落盘、绘画算法、调色板为无头可运行的核心用例。界面侧共 40 条 `Category=UiHost`：`UiSmokeTests` 覆盖帧切换、图层、批量绘画、洋葱皮、时间轴、调色板/预设、参考图、选区与尺寸调整；`UiInteractionTests` 直接调用 `OnMouseDown/OnMouseMove/OnMouseUp/OnKeyDown`，覆盖画布点击/拖拽、右键取色、双轴镜像、选区移动、工具快捷键、镜像/网格/笔刷快捷键、Ctrl+Z/Y 与 F11/Esc；`CanvasGoldenTests` 对 `CanvasControl.NativeBitmap` 做 7 张像素级 golden（画笔、镜像、渐变、图层合成、选区移动、橡皮、直线），只比画布 RGBA，不依赖窗口 DPI 或主题；`FrameTimelineDropTests` 的 6 条纯函数用例覆盖时间轴落点。仅 2 条 `Category=InteractiveUI` 依赖真实 WinForms 消息泵：`PlaybackTimer_AdvancesFrameOnRealMessagePump` 用 `DoEvents` 做正负对照，`PlaybackTimer_AdvancesUnderApplicationRun` 用 `Application.Run` + 6 秒看门狗验证真实消息循环。播放帧推进已抽成 `MainForm.AdvancePlayback(elapsedMs)`，时间轴落点已抽成 `FrameTimeline.ResolveDrop`。当前门禁 191 条（Core 122 + Windows 69）全部通过；本机交互组 2 条通过。覆盖率由 coverlet 采集：当前行覆盖 **69.8%**、分支 **42.2%**；CI 对行 55% / 分支 38% 设下限。CI 另有非阻塞 `ui-probe` 在 `windows-latest` 连跑 20 次 `InteractiveUI`，全部通过前不把该组设为 PR 阻塞门禁。
 
 ## 安装（最终用户）
 
@@ -95,6 +97,15 @@ dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Cate
 5. 每个安装包旁有 `.sha256` 侧车文件，可用 `Get-FileHash -Algorithm SHA256 <setup.exe>` 对照；也可用 `安装包\验证安装包.ps1 -SetupPath <setup.exe> -Rid win-x64` 自动检查版本信息、签名、校验和，并在临时目录做一次静默安装/卸载。
 6. 只需要便携使用、或要接 Agent 插件时，仍可下载 zip 包，见下节。
 
+## 自动更新与崩溃报告
+
+- 更新源固定为 `Limak313/PixelCanvas-src` 的 GitHub 最新正式 Release；只接受带 `.sha256` 侧车的安装包。下载后先校验 SHA-256，再按需检查签名者；校验失败不会执行安装。
+- 自动检查默认开启，每 24 小时最多一次；关闭方式：更新对话框中取消“启动时自动检查更新”，或设置 `PIXELCANVAS_DISABLE_UPDATE_CHECK=1`。
+- 需要固定发布签名者时设置 `PIXELCANVAS_UPDATE_SIGNER_THUMBPRINT=<证书 SHA-1 指纹>`；设置后，安装包必须带签名且指纹一致。当前测试证书指纹为 `46DBE0CC49F653E461A42223697F697B150E58E6`，正式发布前应换成受信任证书。
+- 安装会先保存工程或写入自动恢复副本，再以 `/SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS` 启动安装器；更新失败不会自动回滚旧版本。
+- 崩溃报告默认只落盘到 `%LOCALAPPDATA%\PixelCanvas\CrashReports`（同名 `.json` 与 `.txt`），不主动采集工程内容、用户名、机器名；异常堆栈本身可能包含程序安装路径。设置 `PIXELCANVAS_CRASH_ENDPOINT=https://...` 后才会上报同一份 JSON；本机调试可用 `http://127.0.0.1:<port>/...`，其他 HTTP 地址会被拒绝。需要鉴权时再设置 `PIXELCANVAS_CRASH_TOKEN`，上报时使用 `Authorization: Bearer`。
+- 崩溃报告可在“检查更新”对话框中的“打开崩溃报告目录”查看；UI 线程异常会提示并退出，后台未观察任务异常只记录，不打断编辑。
+
 ## 代码签名
 
 正式分发必须使用受信任 CA 签发的代码签名证书（OV/EV）。自签名证书只用于验证签名链路，**不会消除 SmartScreen 的“未知发布者”**。
@@ -104,7 +115,7 @@ dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Cate
 ```powershell
 $pwd = Read-Host 'PFX 口令'  # 仅存于当前会话，不要写进脚本
 # 生成安装包时同时签名 app\PixelCanvas.exe、server\PixelCanvas.Mcp.exe 与 Setup.exe
-.\安装包\生成安装包.ps1 -PackageRoot PixelCanvas-Agent-1.0.46-win-x64 -Rid win-x64 `
+.\安装包\生成安装包.ps1 -PackageRoot PixelCanvas-Agent-1.0.47-win-x64 -Rid win-x64 `
   -SignPfxPath 'D:\certs\codesign.pfx' -SignPfxPassword $pwd -RequireSignature
 ```
 
