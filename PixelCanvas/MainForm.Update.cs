@@ -108,7 +108,8 @@ public sealed partial class MainForm
 
         if (IsDisposed || Disposing) return;
         var confirm = MessageBox.Show(this,
-            $"安装包已下载并通过 SHA-256 校验：\n{installerPath}\n\n安装会关闭 PixelCanvas，随后静默运行安装器。\n是否立即安装？",            "安装更新", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+            $"安装包已下载并通过 SHA-256 校验：\n{installerPath}\n\n安装会关闭 PixelCanvas，随后静默运行安装器。\n是否立即安装？",
+            "安装更新", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
         if (confirm != DialogResult.Yes) return;
         if (!PrepareForUpdateInstall()) return;
 
