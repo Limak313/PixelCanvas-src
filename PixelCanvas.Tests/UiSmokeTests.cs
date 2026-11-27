@@ -13,8 +13,8 @@ namespace PixelCanvas.Tests;
 /// 播放定时器、批量绘画、组合工具、批量帧、洋葱皮、时间轴拖放、调色板与预设、双轴镜像、
 /// 图层合成、参考图、填充/渐变镜像、选区、图层、视图与尺寸调整等界面路径。
 /// 分组：只依赖「能创建窗体句柄」的用例标 Category=UiHost，随默认门禁进 CI；
-/// 依赖真实 WinForms 定时器消息泵的用例标 Category=InteractiveUI，仅在本机交互式桌面执行
-/// （.\构建与测试.ps1 -Ui 或 --filter "Category=InteractiveUI"）。
+/// 依赖真实 WinForms 定时器消息泵的用例标 Category=InteractiveUI，由 CI ui-probe 非阻塞测量，
+/// 本机也可用 .\构建与测试.ps1 -Ui 或 --filter "Category=InteractiveUI" 执行。
 /// </summary>
 public class UiSmokeTests
 {

@@ -2,7 +2,9 @@ name: CI
 
 # 持续集成门禁：Windows 全量构建与测试，另加 Linux 核心构建，确认 Core/MCP 不依赖 Windows。
 # 桌面与实时画布宿主仍为 net10.0-windows + WinForms；Core 与 MCP 为 net10.0。
-# UI 冒烟用例标记 [Trait("Category","UI")]，依赖交互式桌面，门禁中用 --filter "Category!=UI" 排除。
+# 无头门禁用 --filter "Category!=InteractiveUI" 排除真实消息泵用例；
+# ui-probe 以非阻塞方式在 windows-latest 连跑 20 次，先测量该组在托管 runner 上的稳定性。
+# 探针全绿之前不把 InteractiveUI 设成 PR 阻塞门禁。
 
 on:
   push:
@@ -103,6 +105,54 @@ jobs:
           path: |
             PixelCanvas/bin/Release/net10.0-windows/
             PixelCanvas.Mcp/bin/Release/net10.0/
+          retention-days: 14
+
+  ui-probe:
+    name: Interactive UI Probe (non-blocking)
+    runs-on: windows-latest
+    continue-on-error: true
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Restore
+        run: dotnet restore PixelCanvas.Tests/PixelCanvas.Tests.csproj --nologo
+
+      - name: Build test host
+        run: dotnet build PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --no-restore --nologo -warnaserror
+
+      - name: Run InteractiveUI 20 times
+        shell: pwsh
+        run: |
+          $passed = 0
+          $failed = 0
+          New-Item -ItemType Directory -Force ui-probe | Out-Null
+          for ($i = 1; $i -le 20; $i++) {
+            Write-Host "::group::InteractiveUI run $i/20"
+            dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --no-build --nologo `
+              --filter "Category=InteractiveUI" `
+              --logger "trx;LogFileName=interactive-ui-$i.trx" `
+              --results-directory ui-probe
+            if ($LASTEXITCODE -eq 0) { $passed++ } else { $failed++ }
+            Write-Host "::endgroup::"
+          }
+          Write-Host ("InteractiveUI probe: {0}/20 passed, {1} failed" -f $passed, $failed)
+          if ($failed -ne 0) { exit 1 }
+
+      - name: Upload InteractiveUI results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: interactive-ui-probe
+          path: ui-probe/
           retention-days: 14
 
   core-linux:

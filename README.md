@@ -70,19 +70,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\构建与测试.ps1 -Cover
 # 全量构建解决方案（PixelCanvas.Core / PixelCanvas.Mcp / PixelCanvas / 两个测试项目）
 dotnet build PixelCanvas.slnx -c Release
 
-# 运行全部无头测试（Core 86 条 + Windows 49 条，排除 InteractiveUI）
+# 运行全部无头测试（Core 86 条 + Windows 64 条，排除 InteractiveUI）
 dotnet test PixelCanvas.slnx -c Release --filter "Category!=InteractiveUI"
 
 # 只跑核心库测试（Linux/macOS 上可单独执行这一条）
 dotnet test PixelCanvas.Core.Tests/PixelCanvas.Core.Tests.csproj -c Release
 
-# 运行真交互冒烟组（仅 1 条，需桌面会话与真实定时器消息泵）
+# 运行真交互冒烟组（2 条，需真实定时器消息泵）
 dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Category=InteractiveUI"
 ```
 
 项目分层：`PixelCanvas.Core`（`net10.0`，像素模型、工程读写、撤销历史、GIF/SVG/PNG/精灵表/序列帧导出、路径与 MCP 画布模型，不引用 System.Drawing）；`PixelCanvas.Mcp`（`net10.0`，stdio MCP 宿主，文件级 `project_*` 工具与无头导出可跨平台，`open_canvas` 在非 Windows 返回明确错误）；`PixelCanvas`（`net10.0-windows` + WinForms 桌面界面）；`PixelCanvas.Core.Tests`（`net10.0`，可在 Linux CI 运行）；`PixelCanvas.Tests`（`net10.0-windows`，界面与位图相关用例）。
 
-测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、原子写入、撤销历史落盘、绘画算法、调色板为无头可运行的核心用例；`UiSmokeTests` 的 11 条界面路径用例按环境依赖分两组：10 条只要求能创建窗体句柄，标 `Category=UiHost`，随默认门禁进入 CI；仅 1 条 `PlaybackTimer_AdvancesFrameOnRealMessagePump` 依赖真实 WinForms 定时器消息泵，标 `Category=InteractiveUI`，在本机用 `-Ui` 执行。播放帧推进已抽成 `MainForm.AdvancePlayback(elapsedMs)`，由 `Playback_AdvanceByElapsedSwitchesFrame` 直接注入耗时验证；时间轴落点已抽成 `FrameTimeline.ResolveDrop` 纯函数，由 `FrameTimelineDropTests` 的 6 条用例覆盖。`FrameUndoTests`、`LayerUndoTests` 与 `UiHostProbeTests` 同属 `Category=UiHost`，分别覆盖帧与图层的结构撤销、以及运行环境能否承载界面用例；`UndoJournalTests` 为无头用例，覆盖撤销历史落盘的栈序还原、拒绝不匹配文件与步数截断；`ExportFormatsTests` 与 `McpExportFormatTests` 覆盖 SVG 色块合并、序列帧命名与缩放、非空目录拒绝，以及新增导出动作的 MCP 路由；`McpRoutingTests` 锁住「每个操作只属于一个分组入口、`tool_info` 枚举为并集」。当前门禁 135 条（Core 86 + Windows 49），本机交互组 1 条。覆盖率由 coverlet 采集：当前行覆盖 **64.3%**、分支 **46.4%**；CI 对行 55% / 分支 38% 设下限，低于下限即失败。
+测试基于 xUnit：工程读写与格式兼容、MCP 路由、导出（GIF/精灵表/路径分类）、原子写入、撤销历史落盘、绘画算法、调色板为无头可运行的核心用例。界面侧共 40 条 `Category=UiHost`：`UiSmokeTests` 覆盖帧切换、图层、批量绘画、洋葱皮、时间轴、调色板/预设、参考图、选区与尺寸调整；`UiInteractionTests` 直接调用 `OnMouseDown/OnMouseMove/OnMouseUp/OnKeyDown`，覆盖画布点击/拖拽、右键取色、双轴镜像、选区移动、工具快捷键、镜像/网格/笔刷快捷键、Ctrl+Z/Y 与 F11/Esc；`CanvasGoldenTests` 对 `CanvasControl.NativeBitmap` 做 7 张像素级 golden（画笔、镜像、渐变、图层合成、选区移动、橡皮、直线），只比画布 RGBA，不依赖窗口 DPI 或主题；`FrameTimelineDropTests` 的 6 条纯函数用例覆盖时间轴落点。仅 2 条 `Category=InteractiveUI` 依赖真实 WinForms 消息泵：`PlaybackTimer_AdvancesFrameOnRealMessagePump` 用 `DoEvents` 做正负对照，`PlaybackTimer_AdvancesUnderApplicationRun` 用 `Application.Run` + 6 秒看门狗验证真实消息循环。播放帧推进已抽成 `MainForm.AdvancePlayback(elapsedMs)`，时间轴落点已抽成 `FrameTimeline.ResolveDrop`。当前门禁 150 条（Core 86 + Windows 64）全部通过；本机交互组 2 条通过。覆盖率由 coverlet 采集：当前行覆盖 **65.0%**、分支 **46.5%**；CI 对行 55% / 分支 38% 设下限。CI 另有非阻塞 `ui-probe` 在 `windows-latest` 连跑 20 次 `InteractiveUI`，全部通过前不把该组设为 PR 阻塞门禁。
 
 ## 安装（最终用户）
 

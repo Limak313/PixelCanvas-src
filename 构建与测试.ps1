@@ -1,6 +1,7 @@
 ﻿# 一键 Release 全量构建并运行核心测试。
 # 默认只跑核心测试（排除 Category=InteractiveUI 的真交互冒烟用例）。
 # 加 -Ui 会在核心测试后再跑交互组，要求当前会话可交互（能在本机桌面上创建窗体句柄）。
+# CI 另有非阻塞 ui-probe，在 windows-latest 连跑 20 次该组以测量托管 runner 稳定性。
 # 加 -Coverage 会在核心测试时收集覆盖率，并在结束时打印行/分支覆盖率（HTML 报告在 coverage\report）。
 # 在仓库根目录执行：powershell -NoProfile -ExecutionPolicy Bypass -File .\构建与测试.ps1 [-Ui] [-Coverage]
 param(

@@ -2,6 +2,19 @@
 
 本项目遵循语义化版本；版本号由根目录 `Directory.Build.props` 集中管理，桌面程序、MCP 服务与插件清单对齐同一版本。
 
+## [1.0.45] - 2026-11-27
+
+### 变更
+- 新增 `UiInteractionTests` 8 条控件事件层用例：直接向 `CanvasControl` 发送鼠标消息并调用 `MainForm.OnKeyDown`，覆盖点击/拖拽绘画、右键取色、双轴镜像、选区拖拽与移动、工具快捷键、镜像/网格/笔刷快捷键、Ctrl+Z/Y、F11/Esc，不需要移动真实鼠标。
+- 新增 `CanvasGoldenTests` 7 张画布 golden：只比对 `CanvasControl.NativeBitmap` 的 RGBA，固定 16×16 与 1× 缩放，避开窗口 DPI、主题和网格线；基线为 `PixelCanvas.Tests/TestData/Golden/*.png`，用 `PIXELCANVAS_UPDATE_GOLDEN=1` 重建。
+- 新增 `UiMessagePumpTests.PlaybackTimer_AdvancesUnderApplicationRun`：用 `Application.Run` + 6 秒看门狗跑真实消息循环，和原 `DoEvents` 用例形成两条 `InteractiveUI` 烟测。
+- CI 新增非阻塞 `ui-probe`：在 `windows-latest` 连跑 20 次 `Category=InteractiveUI` 并归档 trx；全绿前不把该组设成 PR 阻塞门禁。
+
+### 测试
+- 无头门禁 150 条（Core 86 + Windows 64）全部通过，其中 `Category=UiHost` 40 条。
+- 本机交互组 2 条通过，单次约 1–2 秒。
+- 覆盖率提升到行 **65.0%**、分支 **46.5%**。
+
 ## [1.0.44] - 2026-11-24
 
 ### 变更
