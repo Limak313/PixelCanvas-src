@@ -73,7 +73,7 @@ jobs:
           $version = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version
           $tag = $env:GITHUB_REF_NAME
           $changelog = Get-Content CHANGELOG.md -Raw
-          $section = [regex]::Match($changelog, "(?s)##\s*\[$([regex]::Escape($version))\].*?(?=\n##\s*\[|\z)").Value.Trim()
+          $section = [regex]::Match($changelog, "(?s)##\s*\[(?:未发布.*?)?$([regex]::Escape($version))\].*?(?=\n##\s*\[|\z)").Value.Trim()
           if (-not $section) { $section = "## [$version]" + [Environment]::NewLine + [Environment]::NewLine + "见 CHANGELOG。" }
           $assets = [Environment]::NewLine + [Environment]::NewLine + "---" + [Environment]::NewLine + `
             "Windows x64 / arm64：``PixelCanvas-$version-win-x64-setup.exe`` 与 ``PixelCanvas-$version-win-arm64-setup.exe`` 为自包含安装包（各约 52 MB，无需预装 .NET，安装到当前用户目录并创建开始菜单与桌面快捷方式）；``PixelCanvas-$version-<rid>-slim.zip`` 为免安装精简包（需对应架构的 .NET 10 桌面运行时）；``PixelCanvas-Agent-$version-<rid>.zip`` 为自包含免安装包；``pixelcanvas-plugin-$version.zip`` 为 Agent 插件（x64）。同目录 ``.sha256`` 为安装包 SHA-256 校验和；若仓库配置了 ``PIXELCANVAS_SIGN_PFX_BASE64``，主程序、MCP 入口与安装包同时带 Authenticode 签名，未配置则为未签名包。无头核心测试、Linux MCP 冒烟、覆盖率下限与格式门禁已在 CI 通过。"
