@@ -3,8 +3,9 @@
   "interface": { "displayName": "PixelCanvas Local" },
   "plugins": [{
     "name": "pixelcanvas-desktop",
-    "source": { "source": "local", "path": "./plugins/pixelcanvas-desktop-v1044" },
+    "source": { "source": "local", "path": "./plugins/pixelcanvas-desktop-v1045" },
     "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
     "category": "Productivity"
   }]
 }
+

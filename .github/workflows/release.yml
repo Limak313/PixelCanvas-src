@@ -3,7 +3,7 @@ name: Release
 # 发布打包：打 tag（v*）或手动触发时，Windows 环境先过构建+无头测试门禁，
 # 再产出自包含部署包 zip 与插件包 zip，并创建 GitHub Release 上传资产。
 # 桌面与实时画布宿主仍为 net10.0-windows + WinForms；Core 与 MCP 为 net10.0。
-# 门禁排除 [Trait("Category","UI")] 的交互式冒烟用例（依赖桌面会话，在本机用 -Ui 手动执行）。
+# 门禁排除 Category=InteractiveUI 的真实消息泵用例（由 CI ui-probe 非阻塞测量，发布前在本机用 -Ui 执行）。
 
 on:
   push:
@@ -33,7 +33,7 @@ jobs:
         run: |
           dotnet format whitespace PixelCanvas.slnx --verify-no-changes
           dotnet build PixelCanvas.slnx -c Release --nologo -warnaserror
-          dotnet test PixelCanvas.slnx -c Release --no-build --nologo --filter "Category!=UI"
+          dotnet test PixelCanvas.slnx -c Release --no-build --nologo --filter "Category!=InteractiveUI"
 
       - name: Package deployment zips (x64 + arm64)
         shell: pwsh
