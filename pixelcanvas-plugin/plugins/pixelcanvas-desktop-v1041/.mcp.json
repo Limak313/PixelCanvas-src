@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "pixelcanvas-desktop": {
-      "command": "dotnet",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/server/PixelCanvas.Mcp.dll"]
-    }
-  }
-}
