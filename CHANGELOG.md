@@ -2,6 +2,20 @@
 
 本项目遵循语义化版本；版本号由根目录 `Directory.Build.props` 集中管理，桌面程序、MCP 服务与插件清单对齐同一版本。
 
+## [1.0.46] - 2026-11-27
+
+### 变更
+- 安装器改为简体中文优先、英文可选的双语界面，补齐中文开始菜单项、README/MCP 说明与卸载入口。
+- 安装包写入 FileDescription、ProductName、CompanyName、ProductVersion、Copyright 等版本信息；限制 Windows 10 及以上，保持当前用户安装。
+- 升级时沿用上次安装目录、语言与快捷方式选项；注册 `App Paths\PixelCanvas.exe`，可直接从“运行”启动。
+- 桌面程序与 MCP 入口创建 `Local\PixelCanvas.Running` 互斥量标记，安装器通过 `AppMutex` 检测运行中的程序/服务，升级前提示关闭。
+- 安装脚本可在存在 PFX 时调用 `signtool` 做 SHA-256 时间戳签名并验证 Authenticode；无论是否签名都生成 `.sha256` 侧车文件。
+- 新增 `安装包\验证安装包.ps1`：校验版本信息、签名、SHA-256，并在临时目录做静默安装/卸载与 App Paths、卸载注册项检查。
+
+### 测试
+- 无头门禁 150 条（Core 86 + Windows 64）与本机交互组 2 条继续通过。
+- x64 安装包静默安装/卸载生命周期通过；版本信息、App Paths、卸载注册项和 SHA-256 均按预期清理。
+
 ## [1.0.45] - 2026-11-27
 
 ### 变更

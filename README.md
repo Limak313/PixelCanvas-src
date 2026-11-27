@@ -88,10 +88,12 @@ dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Cate
 
 发布页按架构提供 `PixelCanvas-<version>-win-x64-setup.exe` 与 `PixelCanvas-<version>-win-arm64-setup.exe`（自包含安装包，约 52 MB）：
 
-1. 双击对应架构的安装包，安装到当前用户目录 `%LOCALAPPDATA%\Programs\PixelCanvas`，无需管理员权限、无需预装 .NET。Windows 11 ARM 设备请选 arm64，x64 设备选 x64。
-2. 安装器创建开始菜单项与可选桌面快捷方式；卸载走“设置 → 应用”或安装目录里的 `unins000.exe`，不会删除你自己保存的工程与输出。
-3. 安装包未做代码签名，首次运行可能出现 SmartScreen 提示，选择“更多信息 → 仍要运行”即可。
-4. 只需要便携使用、或要接 Agent 插件时，仍可下载 zip 包，见下节。
+1. 双击对应架构的安装包，安装器提供简体中文/英文界面，安装到当前用户目录 `%LOCALAPPDATA%\Programs\PixelCanvas`，无需管理员权限、无需预装 .NET。Windows 11 ARM 设备请选 arm64，x64 设备选 x64；最低支持 Windows 10。
+2. 安装器创建开始菜单项、可选桌面快捷方式、README/MCP 说明与卸载入口，并注册 `App Paths`，可直接在“运行”里输入 `PixelCanvas`。升级时沿用上次安装目录、语言与快捷方式选项。
+3. 卸载走“设置 → 应用”或开始菜单卸载项，不会删除你自己保存的工程与输出。
+4. 安装包当前未做代码签名，首次运行可能出现 SmartScreen 提示，选择“更多信息 → 仍要运行”即可。维护者可用 `PIXELCANVAS_SIGN_PFX` / `PIXELCANVAS_SIGN_PFX_PASSWORD` 配置 PFX 后重新生成，脚本会调用 `signtool` 做 SHA-256 时间戳签名，并用 `Get-AuthenticodeSignature` 校验。
+5. 每个安装包旁有 `.sha256` 侧车文件，可用 `Get-FileHash -Algorithm SHA256 <setup.exe>` 对照；也可用 `安装包\验证安装包.ps1 -SetupPath <setup.exe> -Rid win-x64` 自动检查版本信息、签名、校验和，并在临时目录做一次静默安装/卸载。
+6. 只需要便携使用、或要接 Agent 插件时，仍可下载 zip 包，见下节。
 
 ## 发布打包
 
@@ -118,6 +120,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\安装包\生成安装包.
 - 生成的部署包目录、`.zip`、`output/` 均在 `.gitignore` 中，不纳入版本管理。
 - 部署包产出后，可用 `pixelcanvas-batch-check.ps1 -PackageRoot <部署包目录>` 做一次跨进程 MCP 绘画与读取校验（两种包都支持；arm64 包需在 ARM 设备上运行）。
 - 安装包脚本复用 Bundle 目录：`.\安装包\生成安装包.ps1 -PackageRoot PixelCanvas-Agent-<version>-win-x64 -Rid win-x64` 可跳过重复打包；脚本需要 Inno Setup 6，本机缺失时会尝试从 GitHub 取官方安装器。Inno Setup 可在 x64 机器上交叉编译 arm64 安装包。
+- 安装器会写入文件版本信息（FileDescription/ProductName/CompanyName/ProductVersion），并用 `PixelCanvas.Running` 互斥量检测桌面程序或 MCP 服务是否仍在运行；桌面端与 MCP 入口都会创建该标记。静默安装/卸载、App Paths 和卸载注册项由 `安装包\验证安装包.ps1` 自动验收。
 
 ## 运行方法
 

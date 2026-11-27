@@ -37,4 +37,5 @@ TestResults/
 
 # 安装包产物
 PixelCanvas-*-setup.exe
+PixelCanvas-*-setup.exe.sha256
 ui-*.log

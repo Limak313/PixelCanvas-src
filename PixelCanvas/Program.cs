@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace PixelCanvas;
@@ -9,6 +10,9 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        // 只作为“程序正在运行”的标记供安装器检测；不阻止同用户启动多个编辑窗口。
+        using var appMutex = new Mutex(true, @"Local\PixelCanvas.Running", out _);
+
         int width = 32, height = 32;
         if (args.Length != 0 && (args.Length != 2 || !int.TryParse(args[0], out width) || !int.TryParse(args[1], out height) || width is < 4 or > 512 || height is < 4 or > 512))
         {
