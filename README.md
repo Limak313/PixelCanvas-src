@@ -91,9 +91,43 @@ dotnet test PixelCanvas.Tests/PixelCanvas.Tests.csproj -c Release --filter "Cate
 1. 双击对应架构的安装包，安装器提供简体中文/英文界面，安装到当前用户目录 `%LOCALAPPDATA%\Programs\PixelCanvas`，无需管理员权限、无需预装 .NET。Windows 11 ARM 设备请选 arm64，x64 设备选 x64；最低支持 Windows 10。
 2. 安装器创建开始菜单项、可选桌面快捷方式、README/MCP 说明与卸载入口，并注册 `App Paths`，可直接在“运行”里输入 `PixelCanvas`。升级时沿用上次安装目录、语言与快捷方式选项。
 3. 卸载走“设置 → 应用”或开始菜单卸载项，不会删除你自己保存的工程与输出。
-4. 安装包当前未做代码签名，首次运行可能出现 SmartScreen 提示，选择“更多信息 → 仍要运行”即可。维护者可用 `PIXELCANVAS_SIGN_PFX` / `PIXELCANVAS_SIGN_PFX_PASSWORD` 配置 PFX 后重新生成，脚本会调用 `signtool` 做 SHA-256 时间戳签名，并用 `Get-AuthenticodeSignature` 校验。
+4. 安装包支持 Authenticode 签名：配置受信任 CA 签发的代码签名证书后，主程序、MCP 入口和 Setup.exe 会一起签名，SmartScreen 才会显示可信发布者。当前仓库未配置正式证书，首次运行仍可能出现“未知发布者”提示，选择“更多信息 → 仍要运行”即可。
 5. 每个安装包旁有 `.sha256` 侧车文件，可用 `Get-FileHash -Algorithm SHA256 <setup.exe>` 对照；也可用 `安装包\验证安装包.ps1 -SetupPath <setup.exe> -Rid win-x64` 自动检查版本信息、签名、校验和，并在临时目录做一次静默安装/卸载。
 6. 只需要便携使用、或要接 Agent 插件时，仍可下载 zip 包，见下节。
+
+## 代码签名
+
+正式分发必须使用受信任 CA 签发的代码签名证书（OV/EV）。自签名证书只用于验证签名链路，**不会消除 SmartScreen 的“未知发布者”**。
+
+本地用 PFX 签名：
+
+```powershell
+$pwd = Read-Host 'PFX 口令'  # 仅存于当前会话，不要写进脚本
+# 生成安装包时同时签名 app\PixelCanvas.exe、server\PixelCanvas.Mcp.exe 与 Setup.exe
+.\安装包\生成安装包.ps1 -PackageRoot PixelCanvas-Agent-1.0.46-win-x64 -Rid win-x64 `
+  -SignPfxPath 'D:\certs\codesign.pfx' -SignPfxPassword $pwd -RequireSignature
+```
+
+也可用环境变量 `PIXELCANVAS_SIGN_PFX`、`PIXELCANVAS_SIGN_PFX_PASSWORD`，或 `PIXELCANVAS_SIGN_THUMBPRINT` 调用本机证书存储中的证书。默认使用 DigiCert 时间戳；自签名测试可加 `-NoTimestamp`。`-RequireSignature` 只接受证书链有效的签名，自签名证书会被拒绝。
+
+CI 签名使用两个 GitHub Secrets：
+
+- `PIXELCANVAS_SIGN_PFX_BASE64`：PFX 文件的 Base64 文本
+- `PIXELCANVAS_SIGN_PFX_PASSWORD`：PFX 口令
+
+配置后，Release 工作流会强制要求签名有效；未配置时仍生成未签名包。生成 Base64 的示例：
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes('D:\certs\codesign.pfx')) | Set-Clipboard
+```
+
+需要本地验证签名链路时，可生成开发用自签名证书：
+
+```powershell
+.\安装包\创建测试证书.ps1
+```
+
+证书与私钥写入被 `.gitignore` 排除的 `.signing\`，不要提交或公开分发。
 
 ## 发布打包
 

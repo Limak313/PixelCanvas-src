@@ -2,6 +2,14 @@
 
 本项目遵循语义化版本；版本号由根目录 `Directory.Build.props` 集中管理，桌面程序、MCP 服务与插件清单对齐同一版本。
 
+## [未发布]
+
+### 变更
+- 安装器签名覆盖主程序 `PixelCanvas.exe`、MCP 入口 `PixelCanvas.Mcp.exe` 与 Setup.exe，不再只签安装包外壳。
+- 支持 PFX、本机证书指纹与 CI Base64 Secret 三种证书来源；配置签名后 Release 工作流强制要求 Authenticode 有效。
+- 新增 `安装包\创建测试证书.ps1`，可生成开发用自签名证书；私钥落在 `.signing\` 并被 `.gitignore` 排除。
+- 验证脚本增加已安装主程序/MCP 的签名者一致性检查。
+
 ## [1.0.46] - 2026-11-27
 
 ### 变更

@@ -43,10 +43,20 @@ jobs:
 
       - name: Package installers (x64 + arm64)
         shell: pwsh
+        env:
+          PIXELCANVAS_SIGN_PFX_BASE64: ${{ secrets.PIXELCANVAS_SIGN_PFX_BASE64 }}
+          PIXELCANVAS_SIGN_PFX_PASSWORD: ${{ secrets.PIXELCANVAS_SIGN_PFX_PASSWORD }}
         run: |
           $version = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version
-          .\安装包\生成安装包.ps1 -PackageRoot "PixelCanvas-Agent-$version-win-x64" -Rid win-x64
-          .\安装包\生成安装包.ps1 -PackageRoot "PixelCanvas-Agent-$version-win-arm64" -Rid win-arm64
+          $signArgs = @{}
+          if (-not [string]::IsNullOrWhiteSpace($env:PIXELCANVAS_SIGN_PFX_BASE64)) {
+            Write-Host '检测到签名证书 Secret，安装包将强制要求有效 Authenticode 签名。'
+            $signArgs['RequireSignature'] = $true
+          } else {
+            Write-Host '未配置 PIXELCANVAS_SIGN_PFX_BASE64，生成未签名安装包。'
+          }
+          .\安装包\生成安装包.ps1 -PackageRoot "PixelCanvas-Agent-$version-win-x64" -Rid win-x64 @signArgs
+          .\安装包\生成安装包.ps1 -PackageRoot "PixelCanvas-Agent-$version-win-arm64" -Rid win-arm64 @signArgs
 
       - name: Package plugin zip
         shell: pwsh
@@ -66,7 +76,7 @@ jobs:
           $section = [regex]::Match($changelog, "(?s)##\s*\[$([regex]::Escape($version))\].*?(?=\n##\s*\[|\z)").Value.Trim()
           if (-not $section) { $section = "## [$version]" + [Environment]::NewLine + [Environment]::NewLine + "见 CHANGELOG。" }
           $assets = [Environment]::NewLine + [Environment]::NewLine + "---" + [Environment]::NewLine + `
-            "Windows x64 / arm64：``PixelCanvas-$version-win-x64-setup.exe`` 与 ``PixelCanvas-$version-win-arm64-setup.exe`` 为自包含安装包（各约 52 MB，无需预装 .NET，安装到当前用户目录并创建开始菜单与桌面快捷方式）；``PixelCanvas-$version-<rid>-slim.zip`` 为免安装精简包（需对应架构的 .NET 10 桌面运行时）；``PixelCanvas-Agent-$version-<rid>.zip`` 为自包含免安装包；``pixelcanvas-plugin-$version.zip`` 为 Agent 插件（x64）。同目录 ``.sha256`` 为安装包 SHA-256 校验和。无头核心测试、Linux MCP 冒烟、覆盖率下限与格式门禁已在 CI 通过。"
+            "Windows x64 / arm64：``PixelCanvas-$version-win-x64-setup.exe`` 与 ``PixelCanvas-$version-win-arm64-setup.exe`` 为自包含安装包（各约 52 MB，无需预装 .NET，安装到当前用户目录并创建开始菜单与桌面快捷方式）；``PixelCanvas-$version-<rid>-slim.zip`` 为免安装精简包（需对应架构的 .NET 10 桌面运行时）；``PixelCanvas-Agent-$version-<rid>.zip`` 为自包含免安装包；``pixelcanvas-plugin-$version.zip`` 为 Agent 插件（x64）。同目录 ``.sha256`` 为安装包 SHA-256 校验和；若仓库配置了 ``PIXELCANVAS_SIGN_PFX_BASE64``，主程序、MCP 入口与安装包同时带 Authenticode 签名，未配置则为未签名包。无头核心测试、Linux MCP 冒烟、覆盖率下限与格式门禁已在 CI 通过。"
           Set-Content release-notes.md ($section + $assets) -Encoding utf8
           $files = @(
             "PixelCanvas-$version-win-x64-setup.exe"

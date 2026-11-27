@@ -5,10 +5,13 @@ param(
     [ValidateSet('win-x64', 'win-arm64')]
     [string]$Rid = 'win-x64',
     [switch]$KeepPackage,
-    # 可选 Authenticode 签名；不传时读取 PIXELCANVAS_SIGN_PFX / PIXELCANVAS_SIGN_PFX_PASSWORD
+    # 可选 Authenticode 签名；不传时读取 PIXELCANVAS_SIGN_PFX / PIXELCANVAS_SIGN_PFX_PASSWORD，
+    # 或读取 PIXELCANVAS_SIGN_PFX_BASE64 在临时目录解码 PFX；也可用证书指纹签名。
     [string]$SignPfxPath = '',
     [string]$SignPfxPassword = '',
+    [string]$SignThumbprint = '',
     [string]$TimestampUrl = '',
+    [switch]$NoTimestamp,
     [switch]$RequireSignature
 )
 $ErrorActionPreference = 'Stop'
@@ -20,13 +23,25 @@ $tempBase = 'pc-installer-payload'
 $version = [string]$props.Project.PropertyGroup.Version
 if ([string]::IsNullOrWhiteSpace($version)) { throw 'Directory.Build.props 未设置 Version。' }
 if ([string]::IsNullOrWhiteSpace($OutputPath)) { $OutputPath = Join-Path $projectRoot "PixelCanvas-$version-$Rid-setup.exe" }
+if (-not [System.IO.Path]::IsPathRooted($OutputPath)) { $OutputPath = Join-Path $projectRoot $OutputPath }
 $targetArch = if ($Rid -eq 'win-arm64') { 'arm64' } else { 'x64compatible' }
 $versionInfoVersion = if (($version.Split('.').Count) -eq 3) { "$version.0" } else { $version }
 if ([string]::IsNullOrWhiteSpace($TimestampUrl)) { $TimestampUrl = 'http://timestamp.digicert.com' }
 if ([string]::IsNullOrWhiteSpace($SignPfxPath)) { $SignPfxPath = $env:PIXELCANVAS_SIGN_PFX }
 if ([string]::IsNullOrWhiteSpace($SignPfxPassword)) { $SignPfxPassword = $env:PIXELCANVAS_SIGN_PFX_PASSWORD }
+if ([string]::IsNullOrWhiteSpace($SignThumbprint)) { $SignThumbprint = $env:PIXELCANVAS_SIGN_THUMBPRINT }
 
 $cleanup = @()
+if ([string]::IsNullOrWhiteSpace($SignPfxPath) -and -not [string]::IsNullOrWhiteSpace($env:PIXELCANVAS_SIGN_PFX_BASE64)) {
+    $pfxBytes = [Convert]::FromBase64String($env:PIXELCANVAS_SIGN_PFX_BASE64)
+    $SignPfxPath = Join-Path $env:TEMP ("pixelcanvas-sign-" + [guid]::NewGuid().ToString('N') + '.pfx')
+    [System.IO.File]::WriteAllBytes($SignPfxPath, $pfxBytes)
+    $cleanup += $SignPfxPath
+}
+$signingEnabled = (-not [string]::IsNullOrWhiteSpace($SignPfxPath)) -or (-not [string]::IsNullOrWhiteSpace($SignThumbprint))
+if ($RequireSignature -and -not $signingEnabled) {
+    throw '启用了 -RequireSignature，但没有提供 PFX、证书指纹或 PIXELCANVAS_SIGN_PFX_BASE64。'
+}
 if ([string]::IsNullOrWhiteSpace($PackageRoot)) {
     foreach ($path in @((Join-Path $projectRoot $tempBase), (Join-Path $projectRoot "$tempBase.zip"), (Join-Path $projectRoot "$tempBase-build"))) {
         if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse -Force }
@@ -84,6 +99,40 @@ function Find-SignTool {
         if ($candidate) { return $candidate }
     }
     return $null
+}
+
+function Invoke-SignFile {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { throw "找不到待签名文件：$Path" }
+    $signArgs = @('sign', '/fd', 'SHA256')
+    if (-not [string]::IsNullOrWhiteSpace($SignPfxPath)) {
+        $signArgs += @('/f', (Resolve-Path -LiteralPath $SignPfxPath).Path)
+        if (-not [string]::IsNullOrWhiteSpace($SignPfxPassword)) { $signArgs += @('/p', $SignPfxPassword) }
+    } elseif (-not [string]::IsNullOrWhiteSpace($SignThumbprint)) {
+        $signArgs += @('/sha1', $SignThumbprint)
+    } else {
+        throw '未提供签名证书。'
+    }
+    if (-not $NoTimestamp) { $signArgs += @('/tr', $TimestampUrl, '/td', 'SHA256') }
+    $signArgs += $Path
+    & $signTool @signArgs
+    if ($LASTEXITCODE -ne 0) { throw "签名失败：$Path" }
+    $sig = Get-AuthenticodeSignature -LiteralPath $Path
+    if ($null -eq $sig.SignerCertificate) { throw "签名后仍没有签名者证书：$Path" }
+    if ($RequireSignature -and $sig.Status -ne 'Valid') {
+        throw "签名校验失败：$Path（$($sig.Status)）"
+    }
+    Write-Host "已签名：$([System.IO.Path]::GetFileName($Path))（$($sig.Status)）"
+}
+
+$signTool = $null
+if ($signingEnabled) {
+    $signTool = Find-SignTool
+    if (-not $signTool) {
+        if ($RequireSignature) { throw '找不到 signtool.exe，无法签名安装包。' }
+        Write-Warning '找不到 signtool.exe，跳过安装包签名。'
+        $signingEnabled = $false
+    }
 }
 
 $iscc = Find-Iscc
@@ -186,26 +235,25 @@ Filename: "{app}\app\PixelCanvas.exe"; Description: "{cm:LaunchProgram,PixelCanv
 "@
 Set-Content -LiteralPath $issPath -Value $iss -Encoding utf8
 
+if ($signingEnabled) {
+    $payloadExes = @(Get-ChildItem -LiteralPath $PackageRoot -Recurse -File |
+        Where-Object { $_.Extension -ieq '.exe' } |
+        Sort-Object FullName)
+    if ($payloadExes.Count -lt 2) { throw "部署包中可执行文件过少，无法完成签名：$($payloadExes.Count)" }
+    Write-Host "签名部署包可执行文件：$($payloadExes.Count) 个"
+    foreach ($payloadExe in $payloadExes) { Invoke-SignFile -Path $payloadExe.FullName }
+}
+
 & $iscc $issPath
 if ($LASTEXITCODE -ne 0) { throw '生成安装包失败。' }
 
 if (-not (Test-Path -LiteralPath $OutputPath)) { throw "未生成预期文件：$OutputPath" }
 
-$signatureStatus = 'NotSigned'
-if (-not [string]::IsNullOrWhiteSpace($SignPfxPath)) {
-    if (-not (Test-Path -LiteralPath $SignPfxPath)) { throw "找不到签名证书：$SignPfxPath" }
-    $signTool = Find-SignTool
-    if (-not $signTool) {
-        if ($RequireSignature) { throw '找不到 signtool.exe，无法签名安装包。' }
-        Write-Warning '找不到 signtool.exe，跳过安装包签名。'
-    } else {
-        $signArgs = @('sign', '/fd', 'SHA256', '/f', (Resolve-Path -LiteralPath $SignPfxPath).Path)
-        if (-not [string]::IsNullOrWhiteSpace($SignPfxPassword)) { $signArgs += @('/p', $SignPfxPassword) }
-        $signArgs += @('/tr', $TimestampUrl, '/td', 'SHA256', $OutputPath)
-        & $signTool @signArgs
-        if ($LASTEXITCODE -ne 0) { throw '安装包签名失败。' }
-    }
+if ($signingEnabled) {
+    Invoke-SignFile -Path $OutputPath
 }
+
+$signatureStatus = 'NotSigned'
 $signature = Get-AuthenticodeSignature -LiteralPath $OutputPath
 $signatureStatus = [string]$signature.Status
 if ($RequireSignature -and $signatureStatus -ne 'Valid') {
@@ -213,8 +261,8 @@ if ($RequireSignature -and $signatureStatus -ne 'Valid') {
 }
 if ($signatureStatus -eq 'Valid') {
     Write-Host "安装包签名：$($signature.SignerCertificate.Subject)"
-} elseif ($RequireSignature) {
-    throw "安装包未签名：$signatureStatus"
+} elseif ($null -ne $signature.SignerCertificate) {
+    Write-Warning "安装包已签名，但证书链不受信任（$signatureStatus）：$($signature.SignerCertificate.Subject)"
 } else {
     Write-Warning "安装包未签名（$signatureStatus）；正式发布建议设置 PIXELCANVAS_SIGN_PFX。"
 }

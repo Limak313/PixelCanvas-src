@@ -38,4 +38,9 @@ TestResults/
 # 安装包产物
 PixelCanvas-*-setup.exe
 PixelCanvas-*-setup.exe.sha256
+# 本地签名证书与私钥（禁止入库）
+/.signing/
+*.pfx
+*.pvk
+*.cer
 ui-*.log

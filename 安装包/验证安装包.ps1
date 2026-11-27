@@ -30,7 +30,12 @@ Assert ($fileDescription -eq "PixelCanvas $version Setup") "FileDescription 不�
 
 $signature = Get-AuthenticodeSignature -LiteralPath $SetupPath
 Write-Host "Authenticode：$($signature.Status)"
-if ($RequireSignature) { Assert ($signature.Status -eq 'Valid') "签名校验失败：$($signature.Status)" }
+$signerThumbprint = $null
+if ($null -ne $signature.SignerCertificate) { $signerThumbprint = $signature.SignerCertificate.Thumbprint }
+if ($RequireSignature) {
+    Assert ($signature.Status -eq 'Valid') "签名校验失败：$($signature.Status)"
+    Assert ($null -ne $signerThumbprint) '安装包没有签名者证书。'
+}
 
 $checksumPath = "$SetupPath.sha256"
 if (Test-Path -LiteralPath $checksumPath) {
@@ -65,6 +70,20 @@ try {
 
     foreach ($relative in @('app\PixelCanvas.exe', 'server\PixelCanvas.Mcp.exe', 'README.md', 'MCP.md', 'unins000.exe')) {
         Assert (Test-Path -LiteralPath (Join-Path $installDir $relative)) "安装后缺少文件：$relative"
+    }
+
+    $appSignature = Get-AuthenticodeSignature -LiteralPath (Join-Path $installDir 'app\PixelCanvas.exe')
+    $serverSignature = Get-AuthenticodeSignature -LiteralPath (Join-Path $installDir 'server\PixelCanvas.Mcp.exe')
+    Write-Host "已安装主程序签名：$($appSignature.Status)；MCP 签名：$($serverSignature.Status)"
+    if ($null -ne $signerThumbprint) {
+        Assert ($null -ne $appSignature.SignerCertificate) '已安装主程序没有签名。'
+        Assert ($null -ne $serverSignature.SignerCertificate) '已安装 MCP 入口没有签名。'
+        Assert ($appSignature.SignerCertificate.Thumbprint -eq $signerThumbprint) '主程序签名者与安装包不一致。'
+        Assert ($serverSignature.SignerCertificate.Thumbprint -eq $signerThumbprint) 'MCP 签名者与安装包不一致。'
+    }
+    if ($RequireSignature) {
+        Assert ($appSignature.Status -eq 'Valid') "主程序签名无效：$($appSignature.Status)"
+        Assert ($serverSignature.Status -eq 'Valid') "MCP 签名无效：$($serverSignature.Status)"
     }
 
     $appPathKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths\PixelCanvas.exe'
