@@ -117,13 +117,25 @@ public class UiSmokeTests
             UiTestSupport.Field<NumericUpDown>(form, "_fpsControl")!.Value = 1;
             UiTestSupport.Invoke(form, "ToggleAnimation");
             Assert.True(UiTestSupport.Field<bool>(form, "_playing"));
+            Assert.Equal(0, UiTestSupport.Field<int>(form, "_activeFrame"));
 
+            int ticks = 0;
+            System.Windows.Forms.Timer timer = UiTestSupport.Field<System.Windows.Forms.Timer>(form, "_animationTimer");
+            timer.Tick += (_, _) => ticks++;
+
+            // 负向对照：只 Sleep 不泵消息，WinForms 定时器不应触发，帧号也不应变化。
+            Thread.Sleep(1100);
+            Assert.Equal(0, ticks);
+            Assert.Equal(0, UiTestSupport.Field<int>(form, "_activeFrame"));
+
+            // 正向对照：DoEvents 泵消息后 Timer.Tick 必须真实触发并切到下一帧。
             var deadline = DateTime.UtcNow.AddSeconds(4);
             while (UiTestSupport.Field<int>(form, "_activeFrame") == 0 && DateTime.UtcNow < deadline)
             {
                 Thread.Sleep(20);
                 Application.DoEvents();
             }
+            Assert.True(ticks > 0, "消息泵运行后未触发 Timer.Tick。");
             Assert.Equal(1, UiTestSupport.Field<int>(form, "_activeFrame"));
 
             UiTestSupport.Invoke(form, "ToggleAnimation");
